@@ -5,45 +5,26 @@
 #include <string.h> 
 #include <pthread.h> // Funções de thread
 #include <unistd.h> // close()
-
-#define ERROR -1
-#define TRUE 1
+#include "env.h"
 
 #define PORT 49153
 #define LISTEN_BACKLOG 11
+#define MAX_NUM_THREADS 8
 
-int status = 0;
-int sock; // File descriptor do socket.
-struct sockaddr_in sock_addr; // Estrutura de dados que armazena o endereço.
+int status, sock; // File descriptor do socket.
 
-void error_handler(const char* message) {
+void error_handler(const char* fail, const char* success) {
     if (status == ERROR) {
-        perror(message);
+        perror(fail);
         close(sock);
         exit(EXIT_FAILURE);
     }
+    printf("%s\n", success);
 }
-
-void *enviar(void *arg) {
-    int client_sock;    
-    
-    client_sock = accept(sock, (struct sockaddr *) &sock_addr, NULL);
-    error_handler("Falha ao aceitar conexão!");
-}
-
-void *baixar(void *arg) {
-    int client_sock;
-
-    client_sock = accept(sock, (struct sockaddr *) &sock_addr, NULL);
-    error_handler("Falha ao aceitar conexão!");
-}
-
-
 
 int main(int argc, char const *argv[])
-{
-    int size_addr = sizeof(sock_addr); // Tamanho da estrutura de endereço.
-    
+{    
+    struct sockaddr_in sock_addr; // Estrutura de dados que armazena o endereço.
     pthread_t ts_id, td_id;
 
     /******************************************/
@@ -53,15 +34,17 @@ int main(int argc, char const *argv[])
     sock = socket(AF_INET, SOCK_STREAM, 0);
 
     if (sock == ERROR) {
-        perror("Falhao ao criar o socket.");
+        perror("Failed to create socket.");
         exit(EXIT_FAILURE);
     }
+
+    printf("Socket created.\n");
 
     /******************************************/
     /* Inicializa a estrutura de endereço.    */
     /******************************************/
 
-    memset(&sock_addr, 0,size_addr);
+    memset(&sock_addr, 0, sizeof(sock_addr));
     sock_addr.sin_addr.s_addr = INADDR_ANY;
     sock_addr.sin_port = htons(PORT);
     sock_addr.sin_family = AF_INET;
@@ -70,20 +53,19 @@ int main(int argc, char const *argv[])
     /* Anexa o endereço local a um socket.    */
     /******************************************/
 
-    status = bind(sock, (struct sockaddr *) &sock_addr, size_addr);
-    error_handler("Falha ao anexar endereço ao socket!");
+    status = bind(sock, (struct sockaddr *) &sock_addr, sizeof(sock_addr));
+    error_handler("Bind failed.", "Successful bind.");
 
     /******************************************/
     /* Escuta requisições de conexão.         */
     /******************************************/
     
     status = listen(sock, LISTEN_BACKLOG);
-    error_handler("Falha ao escutar conexões!");
+    error_handler("Listen failed.", "Listen for connections...");
 
-    pthread_create(&ts_id, NULL, &enviar, NULL);
-    pthread_create(&td_id, NULL, &baixar, NULL);
-
-    while (TRUE);
+    do
+    {
+    } while (TRUE);
     
     return 0;
 }
