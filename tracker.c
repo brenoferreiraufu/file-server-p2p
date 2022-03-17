@@ -20,7 +20,25 @@ void error_handler(const char* message) {
     }
 }
 
+void seek_torrent() {
+}
+
+void insert_torrent() {
+}
+
 void *handle_connections(void *arg) {
+    char buffer[BUFFER_SIZE_MSG];
+    int bytes_read;
+    struct sockaddr_in client_addr;
+    
+    memset(&client_addr, 0, sizeof(client_addr));
+
+    while(TRUE) {
+        bytes_read = recvfrom(sock, buffer, BUFFER_SIZE_MSG, MSG_WAITALL, 
+            (struct sockaddr *) &client_addr, sizeof(client_addr));
+        
+    }
+
     pthread_exit(NULL);
 }
 
