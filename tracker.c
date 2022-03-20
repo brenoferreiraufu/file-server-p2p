@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <string.h>
 #include "env.h"
+#include "session.h"
 
 #define PORT 49154
 #define MAX_NUM_THREAD 8

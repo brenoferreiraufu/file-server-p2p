@@ -41,7 +41,7 @@ void send_file(int client_fd, int fd)
     close(fd);
 }
 
-int request_file(char filename[FILE_MAX_LENGTH]) {
+int request_file(char filename[FILENAME_MAX_LENGTH]) {
     struct sockaddr_in sock_addr;
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
 
@@ -94,7 +94,7 @@ int request_file(char filename[FILE_MAX_LENGTH]) {
 void menu() {
     // Não será necessário pois o peer vai ler o arquivo "torrent"
     int option = 0;
-    char filename[FILE_MAX_LENGTH];
+    char filename[FILENAME_MAX_LENGTH];
     do
     {
         printf("\n1 - Solicitar arquivo");
@@ -106,7 +106,7 @@ void menu() {
             exit(SUCCESS);
         }
 
-        fgets(filename, FILE_MAX_LENGTH + 1, stdin);
+        fgets(filename, FILENAME_MAX_LENGTH + 1, stdin);
         filename[strcspn(filename, "\n")] = '\0';
 
         request_file(filename);
