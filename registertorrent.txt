@@ -1,3 +1,0 @@
-POST
-filename:nome_do_arquivo
-pieces:numero_de_partes

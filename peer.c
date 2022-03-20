@@ -97,12 +97,13 @@ void menu() {
     char filename[FILENAME_MAX_LENGTH];
     do
     {
-        printf("\n1 - Solicitar arquivo");
-        printf("\n2 - Sair");
+        printf("\n1 - Solicitar arquivo"); // SEEK =: Entrada um arquivo SEEK
+        printf("\n2 - Compartilhar arquivo"); // POST =: Entrada arquivo POST
+        printf("\n3 - Sair");
 
         scanf("%d", &option);
 
-        if (option == 2) {
+        if (option == 3) {
             exit(SUCCESS);
         }
 

@@ -1,4 +1,3 @@
 SEEK
 tracker:url
 id:identificador
-pieces:numero_de_partes
