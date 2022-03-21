@@ -73,7 +73,7 @@ int request_file(char filename[FILENAME_MAX_LENGTH]) {
     struct sockaddr_in tracker_address;
     tracker_address.sin_family = AF_INET;
     tracker_address.sin_port = htons(49152);
-    tracker_address.sin_addr.s_addr = inet_addr(TRACKER_IP);
+    tracker_address.sin_addr.s_addr = inet_addr("192.168.0.1");
 
     // TODO Arquivo torrent que terá nome do arquivo e IP do tracker
 

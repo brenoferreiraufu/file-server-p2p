@@ -13,6 +13,8 @@
 #define LISTEN_BACKLOG 12
 
 int sock, status;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+list *li;
 
 void error_handler(const char* message) {
     if (status == ERROR) {
@@ -23,23 +25,35 @@ void error_handler(const char* message) {
 }
 
 void seek_torrent() {
+    pthread_mutex_lock(&mutex);
+    
+    pthread_mutex_unlock(&mutex);
 }
 
-void post_torrent() {
+void post_torrent(struct sockaddr_in sock_addr, char filename[260], char sha[260]) {
+    pthread_mutex_lock(&mutex);
+    char address[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(sock_addr.sin_addr), address, INET_ADDRSTRLEN);
+    insert_session(li, filename, sha, address);
+    // list *li, char filename[LENGTH], char sha[LENGTH], char address[LENGTH]
+    pthread_mutex_unlock(&mutex);
 }
 
 void *handle_connections(void *arg) {
     int client_sock, data_length;
     long id = (long) arg + 1;
     char buffer[BUFFER_SIZE_MSG];
-    char method[10];
+    char *method, *filename, *sha;
+    struct sockaddr_in sock_addr;
+    socklen_t client_address_len = sizeof(sock_addr);
 
     do
     {
-        client_sock = accept(sock, NULL, NULL);
+        memset(&sock_addr, 0, sizeof(sock_addr));
+        client_sock = accept(sock, (struct sockaddr*) &sock_addr, &client_address_len);
         
         if (client_sock == ERROR) {
-            printf("[thread-%d] Accept failed for %d client socket.\n", id, client_sock);
+            printf("[thread-%ld] Accept failed for %d client socket.\n", id, client_sock);
             continue;
         }
 
@@ -51,7 +65,7 @@ void *handle_connections(void *arg) {
 
         if (data_length == ERROR)
         {
-            printf("[thread-%d] Receive message failed for %d", id, client_sock);
+            printf("[thread-%ld] Receive message failed for %d", id, client_sock);
             perror(" client socket.\n");
             close(client_sock);
             continue;
@@ -59,19 +73,21 @@ void *handle_connections(void *arg) {
 
         if (data_length == 0)
         {
-            printf("[thread-%d] Connection closed by %d client socket.", id, client_sock);
+            printf("[thread-%ld] Connection closed by %d client socket.", id, client_sock);
             close(client_sock);
             continue;
         }
 
-        sscanf(buffer, "%s\n", method);
+        method = strtok(buffer, "\n");
+        filename = strtok(NULL, "\n");
+        sha = strtok(NULL, "\n");
 
         if (!strcmp(method, "SEEK")) {
             seek_torrent();
         } else if (!strcmp(method, "POST")) {
-            post_torrent();
+            post_torrent(sock_addr, filename, sha);
         } else {
-            printf("[thread-%d] Invalid message from %d client socket.", id, client_sock);
+            printf("[thread-%ld] Invalid message from %d client socket.", id, client_sock);
             close(client_sock);
             continue;
         }
@@ -85,8 +101,10 @@ void *handle_connections(void *arg) {
 int main(int argc, char const *argv[])
 {
     struct sockaddr_in sock_addr;
-    int num_threads = 0;
+    long num_threads = 0;
     pthread_t threads[MAX_NUM_THREAD];
+
+    li = create_list();
 
     /******************************************/
     /* Criando o socket UDP para conexão.     */
@@ -133,7 +151,7 @@ int main(int argc, char const *argv[])
             error_handler("[main] pthread create failed.");
         }
 
-        printf("[main] %d thread created.\n", num_threads + 1);
+        printf("[main] %ld thread created.\n", num_threads + 1);
 
         status = pthread_detach(threads[num_threads]);
         
@@ -142,7 +160,7 @@ int main(int argc, char const *argv[])
             error_handler("[main] pthread detach failed.");
         }
 
-        printf("[main] %d thread detached.\n", num_threads + 1);
+        printf("[main] %ld thread detached.\n", num_threads + 1);
 
     } while (++num_threads < MAX_NUM_THREAD);
 
