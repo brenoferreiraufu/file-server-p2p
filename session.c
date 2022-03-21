@@ -72,36 +72,40 @@ int insert_peer(swarm *li, char address[INET_ADDRSTRLEN])
     }
 }
 
-int insert_session(list *li, char filename[LENGTH], char sha[LENGTH], char address[INET_ADDRSTRLEN])
+session *insert_session(list *li, char filename[LENGTH], char address[INET_ADDRSTRLEN])
 {
     if (li == NULL)
-        return -1;
+        return NULL;
 
     if (li->size < LENGTH)
     {
+        uuid_t binuuid;
+        uuid_generate_random(binuuid);
+        uuid_unparse(binuuid, li->sessions[li->size].id);
+
         strcpy(li->sessions[li->size].filename, filename);
-        strcpy(li->sessions[li->size].sha, sha);
         li->sessions[li->size].peers = create_swarm();
 
         insert_peer(li->sessions[li->size].peers, address);
 
         li->size++;
-        return 0;
+        return &li->sessions[li->size-1];
     }
 
-    return -1;
+    return NULL;
 }
 
-session *get_session_by_id(list *li, int id)
+session *get_session_by_id(list *li, char uuid[UUID_STR_LEN])
 {
     if (li == NULL)
         return NULL;
-    if (id >= li->size || id < 0)
-    {
-        return NULL;
+    
+    for (int i = 0; i < li->size; i++) {
+        if (!strcmp(li->sessions[i].id, uuid))
+            return &li->sessions[i];
     }
-
-    return &li->sessions[id];
+    
+    return NULL;
 }
 
 int remove_peer(swarm *li, char address[INET_ADDRSTRLEN])
@@ -134,19 +138,22 @@ int remove_peer(swarm *li, char address[INET_ADDRSTRLEN])
     }
 }
 
-int remove_session(list *li, int id)
+int remove_session(list *li, char uuid[UUID_STR_LEN])
 {
     if (li == NULL)
         return -1;
 
-    if (id >= li->size || id < 0)
-    {
-        return -2;
+    int i;
+    for (i = 0; i < li->size; i++) {
+        if (!strcmp(li->sessions[i].id, uuid))
+            break;
     }
 
-    free_swarm(li->sessions[id].peers);
+    if (i >= li->size) return -1;
 
-    for (int k = id; k < li->size - 1; k++) {
+    free_swarm(li->sessions[i].peers);
+
+    for (int k = i; k < li->size - 1; k++) {
         li->sessions[k] = li->sessions[k + 1];
     }
 

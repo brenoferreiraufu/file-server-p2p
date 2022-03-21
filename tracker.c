@@ -12,7 +12,10 @@
 #define MAX_NUM_THREAD 8
 #define LISTEN_BACKLOG 12
 
+#define LIST_INSERT_FAILED "FAILED\nno-space\n"
+
 int sock, status;
+char *tracker_ip;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 list *li;
 
@@ -30,14 +33,21 @@ void seek_torrent() {
     pthread_mutex_unlock(&mutex);
 }
 
-void post_torrent(struct sockaddr_in sock_addr, char filename[260], char sha[260]) {
-    pthread_mutex_lock(&mutex);
+void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[260], char sha[260]) {
+    char buffer[BUFFER_SIZE_MSG];
     char address[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &(sock_addr.sin_addr), address, INET_ADDRSTRLEN);
-    insert_session(li, filename, sha, address);
-    // TODO retornar id e enviar "arquivo" SEEK
-    // TODO Busca pelo SHA?
+    inet_ntop(AF_INET, &(sock_addr.sin_addr), address, INET_ADDRSTRLEN); // converte para string
+    
+    pthread_mutex_lock(&mutex);
+    session *se = insert_session(li, filename, address);
     pthread_mutex_unlock(&mutex);
+
+    if (se == NULL) {
+        send(client_sock, LIST_INSERT_FAILED, sizeof(LIST_INSERT_FAILED), NULL);
+        return;
+    }
+
+    sprintf(buffer, "SEEK\n%s\n%s", se->id, );
 }
 
 void *handle_connections(void *arg) {
@@ -86,7 +96,7 @@ void *handle_connections(void *arg) {
         if (!strcmp(method, "SEEK")) {
             seek_torrent();
         } else if (!strcmp(method, "POST")) {
-            post_torrent(sock_addr, filename, sha);
+            post_torrent(client_sock, sock_addr, filename, sha);
         } else {
             printf("[thread-%ld] Invalid message from %d client socket.", id, client_sock);
             close(client_sock);
@@ -101,11 +111,27 @@ void *handle_connections(void *arg) {
 
 int main(int argc, char const *argv[])
 {
+    if (argc < 2) {
+        perror("[main] No arguments");
+        exit(EXIT_FAILURE);
+    }
+
+    tracker_ip = argv[1];
+    puts(tracker_ip);
+    
     struct sockaddr_in sock_addr;
     long num_threads = 0;
     pthread_t threads[MAX_NUM_THREAD];
 
     li = create_list();
+
+    if (li == NULL)
+    {
+        perror("[main] Failed to create list.");
+        exit(EXIT_FAILURE);
+    }
+
+    
 
     /******************************************/
     /* Criando o socket UDP para conexão.     */
