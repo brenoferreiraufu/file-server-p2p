@@ -47,7 +47,7 @@ void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[2
         return;
     }
 
-    sprintf(buffer, "SEEK\n%s\n%s", se->id, );
+    sprintf(buffer, "SEEK\n%s\n%s", se->id, tracker_ip);
 }
 
 void *handle_connections(void *arg) {
