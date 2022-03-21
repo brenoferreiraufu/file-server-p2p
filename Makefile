@@ -6,8 +6,8 @@ OPT=-O0
 WARN=-Wall
 PTHREAD=-pthread
 FLAGS=$(DEBUG) $(PTHREAD) $(OPT) $(WARN)
-SOURCE_CODE_TRACKER=tracker.c session.h env.h
-SOURCE_CODE_PEER=peer.c env.h
+SOURCE_CODE_TRACKER=tracker.c session.c
+SOURCE_CODE_PEER=peer.c
 
 tracker:
 	$(CC) $(FLAGS) $(SOURCE_CODE_TRACKER) -o $(TARGET_TRACKER)

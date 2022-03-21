@@ -1,3 +1,4 @@
 SEEK
 tracker:url
 id:identificador
+sha:sha

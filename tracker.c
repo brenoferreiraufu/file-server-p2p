@@ -35,7 +35,8 @@ void post_torrent(struct sockaddr_in sock_addr, char filename[260], char sha[260
     char address[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &(sock_addr.sin_addr), address, INET_ADDRSTRLEN);
     insert_session(li, filename, sha, address);
-    // list *li, char filename[LENGTH], char sha[LENGTH], char address[LENGTH]
+    // TODO retornar id e enviar "arquivo" SEEK
+    // TODO Busca pelo SHA?
     pthread_mutex_unlock(&mutex);
 }
 

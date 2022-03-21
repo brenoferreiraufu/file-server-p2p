@@ -151,4 +151,6 @@ int remove_session(list *li, int id)
     }
 
     li->size--;
+
+    return 0;
 }
