@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <pthread.h> // Funções de thread
 #include <unistd.h> // close()
+#include <uuid/uuid.h>
 #include "env.h"
 
 #define PORT 49153
@@ -15,19 +16,21 @@
 
 int sockfd;
 struct sockaddr_in servaddr;
-char tracker_ip[INET_ADDRSTRLEN];
+char tracker_ip[INET_ADDRSTRLEN] = "127.0.0.1";
 
 void share_file() {
     char buffer[BUFFER_SIZE_MSG];
     char filename[FILENAME_MAX_LENGTH];
-    char recvfilename[FILENAME_MAX_LENGTH];
+    char recvfilename[FILENAME_MAX_LENGTH + 4];
+    int bytes_written, data_length;
 
     /************************************************/
     /* Configura a conexão do socket com o tracker. */
     /************************************************/
     
-    fgets(tracker_ip, INET_ADDRSTRLEN, stdin);
-    tracker_ip[strcspn(filename, "\n")] = '\0';
+    // printf("Digite IP do tracker:\n");
+    // fgets(tracker_ip, INET_ADDRSTRLEN, stdin);
+    // tracker_ip[strcspn(tracker_ip, "\n")] = '\0';
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     
@@ -35,15 +38,13 @@ void share_file() {
         perror("[share_file] Failed to create socket.");
         exit(EXIT_FAILURE);
     }
-
-    printf("[share_file] Socket created.\n");
     
     memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_addr.s_addr = tracker_ip;
+    inet_pton(AF_INET, tracker_ip, &(servaddr.sin_addr.s_addr));
     servaddr.sin_port = htons(TRACKER_PORT);
     servaddr.sin_family = AF_INET;
     
-    status = connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) {
+    if (connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) < 0) {
         printf("[share_file] connection with the tracker failed...\n");
 		close(sockfd);
         exit(EXIT_FAILURE);
@@ -52,7 +53,7 @@ void share_file() {
     /************************************************/
     /* Envia mensagem POST para o tracker.          */
     /************************************************/
-    
+    fflush(stdin);
     fgets(filename, FILENAME_MAX_LENGTH, stdin);
     filename[strcspn(filename, "\n")] = '\0';
 
@@ -70,18 +71,19 @@ void share_file() {
     /* Lê a resposta do tracker.                          */
     /******************************************************/
 
+    memset(&buffer, 0, sizeof(buffer));
     data_length = recv(sockfd, buffer, sizeof(buffer), 0);
 
     if (data_length == ERROR) {
         perror("[share_file] Failed to recieve data.");
         close(sockfd);
-        exit(EXIT_FAILURE)
+        exit(EXIT_FAILURE);
     }
 
     if (data_length == 0) {
         perror("[share_file] Connection closed by tracker.");
         close(sockfd);
-        exit(EXIT_FAILURE)
+        exit(EXIT_FAILURE);
     }
         
     close(sockfd);
@@ -90,7 +92,12 @@ void share_file() {
     /* Escreve a resposta do tracker.                     */
     /******************************************************/
 
-    sprintf(recvfilename, "%s.tf", filename);
+    uuid_t binuuid;
+    uuid_generate_random(binuuid);
+    uuid_unparse(binuuid, recvfilename);
+    strcat(recvfilename, ".txt");
+
+    FILE *fp;
     fp = fopen(recvfilename, "w");
 
     if (fp == NULL) {
@@ -98,26 +105,27 @@ void share_file() {
         exit(EXIT_FAILURE);
     }
 
-    fwrite(buffer , sizeof(char), sizeof(buffer) , fp);
+    fwrite(buffer , sizeof(char), strlen(buffer) , fp);
 
     fclose(fp);
 }
 
 void menu() {
-    int option = 0;
+    char option[4];
     do
     {
         printf("\n1 - Solicitar arquivo"); // SEEK =: Entrada um arquivo SEEK
         printf("\n2 - Compartilhar arquivo"); // POST =: Entrada arquivo POST
-        printf("\n3 - Sair");
+        printf("\n3 - Sair\n");
 
-        scanf("%d", &option);
+        fgets(option, sizeof(option), stdin);
+        option[strcspn(option, "\n")] = '\0';
 
-        if (option == 1) {
+        if (option[0] == '1') {
             // TODO SEEK message para o tracker
-        } else if (option == 2) {    
+        } else if (option[0] == '2') {    
             share_file();
-        } else (option == 3) {
+        } else if (option[0] == '3') {
             exit(EXIT_SUCCESS);
         }
     } while (TRUE);

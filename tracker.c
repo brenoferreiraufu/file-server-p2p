@@ -141,6 +141,8 @@ void *handle_connections(void *arg) {
             continue;
         }
 
+        printf("[thread-%ld] Receive for %d client socket.\n", id, client_sock);
+
         method = strtok(buffer, "\n");
 
         if (!strcmp(method, "SEEK")) {
