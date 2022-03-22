@@ -134,7 +134,6 @@ void *handle_connections(void *arg) {
 
     } while (TRUE);
     
-    
     pthread_exit(NULL);
 }
 
@@ -158,8 +157,6 @@ int main(int argc, char const *argv[])
         perror("[main] Failed to create list.");
         exit(EXIT_FAILURE);
     }
-
-    
 
     /******************************************/
     /* Criando o socket UDP para conexão.     */

@@ -9,92 +9,93 @@
 #include "env.h"
 
 #define PORT 49153
+#define TRACKER_PORT 49154
 #define LISTEN_BACKLOG 11
 #define MAX_NUM_THREADS 8
 
-int status, sock_fd; // File descriptor do socket.
+int sockfd;
+struct sockaddr_in servaddr;
+char tracker_ip[INET_ADDRSTRLEN];
 
-void error_handler(const char* fail, const char* success) {
-    if (status == ERROR) {
-        perror(fail);
-        close(sock_fd);
+void share_file() {
+    char buffer[BUFFER_SIZE_MSG];
+    char filename[FILENAME_MAX_LENGTH];
+
+    /************************************************/
+    /* Configura a conexão do socket com o tracker. */
+    /************************************************/
+    
+    fgets(tracker_ip, INET_ADDRSTRLEN, stdin);
+    tracker_ip[strcspn(filename, "\n")] = '\0';
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    
+    if (sockfd == ERROR) {
+        perror("[share_file] Failed to create socket.");
         exit(EXIT_FAILURE);
     }
-    printf("%s\n", success);
-}
 
-void send_file(int client_fd, int fd)
-{
-    char buffer[BUFFER_SIZE_FILE];
-    int bytes_read;
-
-    do
-    {
-        memset(&buffer, 0, sizeof(buffer));
-        bytes_read = read(fd, buffer, BUFFER_SIZE_FILE);
-        if (bytes_read > 0)
-        {
-            send(client_fd, buffer, bytes_read, 0);
-        }
-    } while (bytes_read > 0);
-
-    close(fd);
-}
-
-int request_file(char filename[FILENAME_MAX_LENGTH]) {
-    struct sockaddr_in sock_addr;
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);
-
-    if (sock == ERROR) {
-        perror("[request_file] Failed to create socket.");
-        return ERROR;
-    }
-
-    printf("[request_file] Socket created.\n");
-
-    /******************************************/
-    /* Inicializa a estrutura de endereço.    */
-    /******************************************/
-
+    printf("[share_file] Socket created.\n");
+    
     memset(&sock_addr, 0, sizeof(sock_addr));
-    sock_addr.sin_addr.s_addr = INADDR_ANY;
-    sock_addr.sin_port = htons(PORT);
+    sock_addr.sin_addr.s_addr = tracker_ip;
+    sock_addr.sin_port = htons(TRACKER_PORT);
     sock_addr.sin_family = AF_INET;
     
-    /******************************************/
-    /* Anexa o endereço local a um socket.    */
-    /******************************************/
+    status = connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) {
+        printf("[share_file] connection with the tracker failed...\n");
+		close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+	
+    /************************************************/
+    /* Envia mensagem POST para o tracker.          */
+    /************************************************/
+    
+    fgets(filename, FILENAME_MAX_LENGTH, stdin);
+    filename[strcspn(filename, "\n")] = '\0';
 
-    if (bind(sock, (struct sockaddr *) &sock_addr, sizeof(sock_addr)) < 0) {
-        perror("[request_file] Bind failed.");
-        return ERROR;
+    sprintf(buffer, "POST\n%s", filename);
+    bytes_written = send(sockfd, buffer, strlen(buffer), 0);
+
+    if (bytes_written == ERROR)
+    {
+        perror("[share_file] Failed to send message.\n");
+        close(client_sock);
+        return;
     }
 
-    struct sockaddr_in tracker_address;
-    tracker_address.sin_family = AF_INET;
-    tracker_address.sin_port = htons(49152);
-    tracker_address.sin_addr.s_addr = inet_addr("192.168.0.1");
+    /******************************************************/
+    /* Lê a resposta do tracker.                          */
+    /******************************************************/
 
-    // TODO Arquivo torrent que terá nome do arquivo e IP do tracker
+    data_length = recv(sockfd, buffer, sizeof(buffer), 0);
 
-    //Envia dados.
-    //ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
-    char msg[10] = "Hello!";
-    if ((sendto(sock, msg, sizeof(msg), 0, (struct sockaddr *) &tracker_address, sizeof(tracker_address))) < 0)
-        check_falha("Falha sendto()");
+    if (data_length == ERROR)
+    {
+        perror("Failed to recieve data.\n");
+        close(sockfd);
+        return;
+    }
+
+    if (data_length == 0)
+    {
+        printf("[+] Thread %ld: Closed connection.\n", thread_n);
+        close(sockfd);
+        return;
+    }
+
+    close(sockfd);
+
+    /******************************************************/
+    /* Escreve a resposta do tracker.                     */
+    /******************************************************/
+
     
-    //Recebe dados.
-    socklen_t tracker_address_len = sizeof(tracker_address);
-    char recv_msg[30];
-    //ssize_t recvfrom(int sockfd, void *restrict buf, size_t len, int flags, struct sockaddr *restrict src_addr, socklen_t *restrict addrlen);
-    if ((recvfrom(sock, recv_msg, sizeof(recv_msg), 0, (struct sockaddr*) &tracker_address, &tracker_address_len)) < 0)
-        check_falha("Falha recvfrom()");
 }
 
 void menu() {
-    // Não será necessário pois o peer vai ler o arquivo "torrent"
     int option = 0;
-    char filename[FILENAME_MAX_LENGTH];
     do
     {
         printf("\n1 - Solicitar arquivo"); // SEEK =: Entrada um arquivo SEEK
@@ -103,100 +104,20 @@ void menu() {
 
         scanf("%d", &option);
 
-        if (option == 3) {
-            exit(SUCCESS);
+        if (option == 1) {
+            // TODO SEEK message para o tracker
+        } else if (option == 2) {    
+            share_file();
+        } else (option == 3) {
+            exit(EXIT_SUCCESS);
         }
-
-        fgets(filename, FILENAME_MAX_LENGTH + 1, stdin);
-        filename[strcspn(filename, "\n")] = '\0';
 
         request_file(filename);
     } while (TRUE);
 }
 
 int main(int argc, char const *argv[])
-{    
-    struct sockaddr_in sock_addr; // Estrutura de dados que armazena o endereço.
-    pthread_t ts_id, td_id;
-    char buffer[1024];
-
-    /******************************************/
-    /* Criando o socket TCP para conexão.     */
-    /******************************************/
-
-    sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-
-    if (sock_fd == ERROR) {
-        perror("Failed to create socket.");
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Socket created.\n");
-
-    /******************************************/
-    /* Inicializa a estrutura de endereço.    */
-    /******************************************/
-
-    memset(&sock_addr, 0, sizeof(sock_addr));
-    sock_addr.sin_addr.s_addr = INADDR_ANY;
-    sock_addr.sin_port = htons(PORT);
-    sock_addr.sin_family = AF_INET;
-    
-    /******************************************/
-    /* Anexa o endereço local a um socket.    */
-    /******************************************/
-
-    status = bind(sock_fd, (struct sockaddr *) &sock_addr, sizeof(sock_addr));
-    error_handler("Bind failed.", "Successful bind.");
-
-    /******************************************/
-    /* Escuta requisições de conexão.         */
-    /******************************************/
-    
-    status = listen(sock_fd, LISTEN_BACKLOG);
-    error_handler("Listen failed.", "Listen for connections...");
-
-    do
-    {
-        int client_fd = accept(sock_fd, NULL, NULL);
-        int received_characters = 0;
-
-        if (client_fd == -1)
-        {
-            status = ERROR;
-            error_handler("Accept failed.", "Accept..");
-        }
-
-        received_characters = recv(client_fd, buffer, BUFFER_SIZE_MSG, 0);
-
-        if (received_characters < 1)
-        {
-            close(client_fd);
-            return;
-        }
-
-        char *method, *filename;
-        method = strtok(buffer, " ");
-        filename = strtok(NULL, " ") + 1;
-
-        if (strcmp(method, "GET") != 0)
-        {
-            close(client_fd);
-            continue;
-        }
-
-        int fp = open(filename, O_RDONLY);
-
-        if (fp < 0)
-        {
-            // TODO enviar msg ao tracker para retirar peer do arquivo
-            close(client_fd);
-            continue;
-        }
-
-        send_file(client_fd, fp);
-        close(client_fd);
-    } while (TRUE);
-    
+{  
+    menu();
     return 0;
 }
