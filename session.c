@@ -78,8 +78,9 @@ session *get_session_by_id(list *li, char uuid[UUID_STR_LEN])
         return NULL;
     
     for (int i = 0; i < li->size; i++) {
-        if (!strcmp(li->sessions[i].id, uuid))
+        if (!strcmp(li->sessions[i].id, uuid)) {
             return &li->sessions[i];
+        }
     }
     
     return NULL;

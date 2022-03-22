@@ -33,24 +33,30 @@ void seek_torrent(int client_sock, char id[UUID_STR_LEN]) {
 
     pthread_mutex_lock(&mutex);
     se = get_session_by_id(li, id);
-    pthread_mutex_unlock(&mutex);
 
     if (se == NULL) {
         send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
     } else {
-        // peer *peer = se->peers->head;
-        // char buffer[BUFFER_SIZE_MSG];
+        if (se->head == NULL) {
+            send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+            remove_session(li, id);
+        } else {
+            peer *next = se->head;
+            char buffer[BUFFER_SIZE_MSG];
 
-        // while (next != NULL)
-        // {
-        //     strcat(buffer, next.);
-        // }
-        
-        
-        send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+            while (next != NULL)
+            {
+                strcat(buffer, next->address);
+                strcat(buffer, "\n");
+                next = next->next;
+            }
+            
+            send(client_sock, buffer, strlen(buffer), 0);
+        }
     }
+    pthread_mutex_unlock(&mutex);
 
-
+    close(client_sock);
 }
 
 void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[260]) {
@@ -70,14 +76,14 @@ void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[2
         send(client_sock, buffer, strlen(buffer), 0);
     }
 
-    return;
+    close(client_sock);
 }
 
 void *handle_connections(void *arg) {
     int client_sock, data_length;
     long id = (long) arg + 1;
     char buffer[BUFFER_SIZE_MSG];
-    char *method, *filename;
+    char *method, *filename, *uuid;
     struct sockaddr_in sock_addr;
     socklen_t client_address_len = sizeof(sock_addr);
 
@@ -113,11 +119,12 @@ void *handle_connections(void *arg) {
         }
 
         method = strtok(buffer, "\n");
-        filename = strtok(NULL, "\n");
 
         if (!strcmp(method, "SEEK")) {
-            // seek_torrent();
+            uuid = strtok(NULL, "\n");
+            seek_torrent(client_sock, uuid);
         } else if (!strcmp(method, "POST")) {
+            filename = strtok(NULL, "\n");
             post_torrent(client_sock, sock_addr, filename);
         } else {
             printf("[thread-%ld] Invalid message from %d client socket.", id, client_sock);
@@ -139,7 +146,6 @@ int main(int argc, char const *argv[])
     }
 
     tracker_ip = argv[1];
-    puts(tracker_ip);
     
     struct sockaddr_in sock_addr;
     long num_threads = 0;
