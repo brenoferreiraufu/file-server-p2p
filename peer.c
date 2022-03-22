@@ -20,6 +20,7 @@ char tracker_ip[INET_ADDRSTRLEN];
 void share_file() {
     char buffer[BUFFER_SIZE_MSG];
     char filename[FILENAME_MAX_LENGTH];
+    char recvfilename[FILENAME_MAX_LENGTH];
 
     /************************************************/
     /* Configura a conexão do socket com o tracker. */
@@ -37,10 +38,10 @@ void share_file() {
 
     printf("[share_file] Socket created.\n");
     
-    memset(&sock_addr, 0, sizeof(sock_addr));
-    sock_addr.sin_addr.s_addr = tracker_ip;
-    sock_addr.sin_port = htons(TRACKER_PORT);
-    sock_addr.sin_family = AF_INET;
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_addr.s_addr = tracker_ip;
+    servaddr.sin_port = htons(TRACKER_PORT);
+    servaddr.sin_family = AF_INET;
     
     status = connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) {
         printf("[share_file] connection with the tracker failed...\n");
@@ -60,9 +61,9 @@ void share_file() {
 
     if (bytes_written == ERROR)
     {
-        perror("[share_file] Failed to send message.\n");
-        close(client_sock);
-        return;
+        perror("[share_file] Failed to send message.");
+        close(sockfd);
+        exit(EXIT_FAILURE);
     }
 
     /******************************************************/
@@ -71,27 +72,35 @@ void share_file() {
 
     data_length = recv(sockfd, buffer, sizeof(buffer), 0);
 
-    if (data_length == ERROR)
-    {
-        perror("Failed to recieve data.\n");
+    if (data_length == ERROR) {
+        perror("[share_file] Failed to recieve data.");
         close(sockfd);
-        return;
+        exit(EXIT_FAILURE)
     }
 
-    if (data_length == 0)
-    {
-        printf("[+] Thread %ld: Closed connection.\n", thread_n);
+    if (data_length == 0) {
+        perror("[share_file] Connection closed by tracker.");
         close(sockfd);
-        return;
+        exit(EXIT_FAILURE)
     }
-
+        
     close(sockfd);
 
     /******************************************************/
     /* Escreve a resposta do tracker.                     */
     /******************************************************/
 
-    
+    sprintf(recvfilename, "%s.tf", filename);
+    fp = fopen(recvfilename, "w");
+
+    if (fp == NULL) {
+        perror("[share_file] Open file failed.");
+        exit(EXIT_FAILURE);
+    }
+
+    fwrite(buffer , sizeof(char), sizeof(buffer) , fp);
+
+    fclose(fp);
 }
 
 void menu() {
@@ -111,8 +120,6 @@ void menu() {
         } else (option == 3) {
             exit(EXIT_SUCCESS);
         }
-
-        request_file(filename);
     } while (TRUE);
 }
 

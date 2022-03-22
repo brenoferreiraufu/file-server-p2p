@@ -29,20 +29,31 @@ void error_handler(const char* message) {
 }
 
 void seek_torrent(int client_sock, char id[UUID_STR_LEN]) {
+    int bytes_written;
     session *se;
 
     pthread_mutex_lock(&mutex);
     se = get_session_by_id(li, id);
 
     if (se == NULL) {
-        send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+        bytes_written = send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+
+        if (bytes_written == ERROR)
+            perror("[seek_torrent] Failed to send not found message.");
+
     } else {
         if (se->head == NULL) {
-            send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+            bytes_written = send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+
+            if (bytes_written == ERROR)
+                perror("[seek_torrent] Head null.");
+
             remove_session(li, id);
         } else {
             peer *next = se->head;
             char buffer[BUFFER_SIZE_MSG];
+        
+            strcat(se->filename, next->address);
 
             while (next != NULL)
             {
@@ -51,7 +62,10 @@ void seek_torrent(int client_sock, char id[UUID_STR_LEN]) {
                 next = next->next;
             }
             
-            send(client_sock, buffer, strlen(buffer), 0);
+            bytes_written = send(client_sock, buffer, strlen(buffer), 0);
+
+            if (bytes_written == ERROR)
+                perror("[seek_torrent] Failed to send message.");
         }
     }
     pthread_mutex_unlock(&mutex);
@@ -62,6 +76,7 @@ void seek_torrent(int client_sock, char id[UUID_STR_LEN]) {
 void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[260]) {
     char buffer[BUFFER_SIZE_MSG];
     char address[INET_ADDRSTRLEN];
+    int bytes_written;
     inet_ntop(AF_INET, &(sock_addr.sin_addr), address, INET_ADDRSTRLEN); // converte para string
     
     pthread_mutex_lock(&mutex);
@@ -69,11 +84,19 @@ void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[2
     pthread_mutex_unlock(&mutex);
 
     if (se == NULL) {
-        send(client_sock, LIST_INSERT_FAILED, sizeof(LIST_INSERT_FAILED), 0);
+        bytes_written = send(client_sock, LIST_INSERT_FAILED, sizeof(LIST_INSERT_FAILED), 0);
+        
+        if (bytes_written == ERROR)
+            perror("[post_torrent] Failed to send insert failed message.");
+
+
     } else {
         sprintf(buffer, "SEEK\n%s\n%s", se->id, tracker_ip);
 
-        send(client_sock, buffer, strlen(buffer), 0);
+        bytes_written = send(client_sock, buffer, strlen(buffer), 0);
+
+        if (bytes_written == ERROR)
+            perror("[post_torrent] Failed to send message.");
     }
 
     close(client_sock);
