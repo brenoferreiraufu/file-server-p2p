@@ -3,15 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-swarm *create_swarm()
-{
-    swarm *li;
-    li = malloc(sizeof(swarm));
-    if (li != NULL)
-        li->head = NULL;
-    return li;
-}
-
 list *create_list()
 {
     list *li;
@@ -20,37 +11,23 @@ list *create_list()
     return li;
 }
 
-void free_swarm(swarm *li)
-{
-    if (li != NULL)
-    {
-        peer *p;
-        while (li->head != NULL)
-        {
-            p = li->head;
-            li->head = li->head->next;
-            free(p);
-        }
-        free(li);
-    }
-}
-
 void free_list(list *li)
 {
     if (li != NULL)
     {
         for (int i = 0; i < li->size; i++)
         {
-            free_swarm(li->sessions[i].peers);
+            free_swarm(&li->sessions[i]);
+            
         }
 
         free(li);
     }
 }
 
-int insert_peer(swarm *li, char address[INET_ADDRSTRLEN])
+int insert_peer(session *se, char address[INET_ADDRSTRLEN])
 {
-    if (li == NULL)
+    if (se == NULL)
         return -1;
     peer *element = malloc(sizeof(peer));
     if (element == NULL)
@@ -58,16 +35,16 @@ int insert_peer(swarm *li, char address[INET_ADDRSTRLEN])
 
     strcpy(element->address, address);
 
-    if (li->head == NULL)
+    if (se->head == NULL)
     {
-        li->head = element;
+        se->head = element;
         element->next = NULL;
         return 0;
     }
     else
     {
-        element->next = li->head;
-        li->head = element;
+        element->next = se->head;
+        se->head = element;
         return 0;
     }
 }
@@ -84,9 +61,9 @@ session *insert_session(list *li, char filename[LENGTH], char address[INET_ADDRS
         uuid_unparse(binuuid, li->sessions[li->size].id);
 
         strcpy(li->sessions[li->size].filename, filename);
-        li->sessions[li->size].peers = create_swarm();
+        li->sessions[li->size].head = NULL;
 
-        insert_peer(li->sessions[li->size].peers, address);
+        insert_peer(&li->sessions[li->size], address);
 
         li->size++;
         return &li->sessions[li->size-1];
@@ -108,16 +85,16 @@ session *get_session_by_id(list *li, char uuid[UUID_STR_LEN])
     return NULL;
 }
 
-int remove_peer(swarm *li, char address[INET_ADDRSTRLEN])
+int remove_peer(session *se, char address[INET_ADDRSTRLEN])
 {
-    if (li == NULL)
+    if (se == NULL)
         return -1;
     peer *p = NULL;
-    p = li->head;
+    p = se->head;
     if (p->next == NULL && !strcmp(p->address, address))
     {
         free(p);
-        li->head = NULL;
+        se->head = NULL;
         return 0;
     }
     peer *prev = p;
@@ -138,6 +115,18 @@ int remove_peer(swarm *li, char address[INET_ADDRSTRLEN])
     }
 }
 
+void free_swarm(session *se) {
+    if (se == NULL)
+        return;
+
+    peer *next = se->head;
+    for (peer *pe = next; next != NULL; pe = next)
+    {
+        next = pe->next;
+        free(pe);
+    }
+}
+
 int remove_session(list *li, char uuid[UUID_STR_LEN])
 {
     if (li == NULL)
@@ -151,7 +140,7 @@ int remove_session(list *li, char uuid[UUID_STR_LEN])
 
     if (i >= li->size) return -1;
 
-    free_swarm(li->sessions[i].peers);
+    free_swarm(&li->sessions[i]);
 
     for (int k = i; k < li->size - 1; k++) {
         li->sessions[k] = li->sessions[k + 1];

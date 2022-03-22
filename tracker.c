@@ -12,10 +12,11 @@
 #define MAX_NUM_THREAD 8
 #define LISTEN_BACKLOG 12
 
-#define LIST_INSERT_FAILED "FAILED\nno-space\n"
+#define LIST_INSERT_FAILED "FAIL\nno-space\n"
+#define TORRENT_NOT_FOUND "FAIL\nnot-found\n"
 
 int sock, status;
-char *tracker_ip;
+const char *tracker_ip;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 list *li;
 
@@ -27,13 +28,32 @@ void error_handler(const char* message) {
     }
 }
 
-void seek_torrent() {
+void seek_torrent(int client_sock, char id[UUID_STR_LEN]) {
+    session *se;
+
     pthread_mutex_lock(&mutex);
-    
+    se = get_session_by_id(li, id);
     pthread_mutex_unlock(&mutex);
+
+    if (se == NULL) {
+        send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+    } else {
+        // peer *peer = se->peers->head;
+        // char buffer[BUFFER_SIZE_MSG];
+
+        // while (next != NULL)
+        // {
+        //     strcat(buffer, next.);
+        // }
+        
+        
+        send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+    }
+
+
 }
 
-void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[260], char sha[260]) {
+void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[260]) {
     char buffer[BUFFER_SIZE_MSG];
     char address[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &(sock_addr.sin_addr), address, INET_ADDRSTRLEN); // converte para string
@@ -43,18 +63,21 @@ void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[2
     pthread_mutex_unlock(&mutex);
 
     if (se == NULL) {
-        send(client_sock, LIST_INSERT_FAILED, sizeof(LIST_INSERT_FAILED), NULL);
-        return;
+        send(client_sock, LIST_INSERT_FAILED, sizeof(LIST_INSERT_FAILED), 0);
+    } else {
+        sprintf(buffer, "SEEK\n%s\n%s", se->id, tracker_ip);
+
+        send(client_sock, buffer, strlen(buffer), 0);
     }
 
-    sprintf(buffer, "SEEK\n%s\n%s", se->id, tracker_ip);
+    return;
 }
 
 void *handle_connections(void *arg) {
     int client_sock, data_length;
     long id = (long) arg + 1;
     char buffer[BUFFER_SIZE_MSG];
-    char *method, *filename, *sha;
+    char *method, *filename;
     struct sockaddr_in sock_addr;
     socklen_t client_address_len = sizeof(sock_addr);
 
@@ -91,12 +114,11 @@ void *handle_connections(void *arg) {
 
         method = strtok(buffer, "\n");
         filename = strtok(NULL, "\n");
-        sha = strtok(NULL, "\n");
 
         if (!strcmp(method, "SEEK")) {
-            seek_torrent();
+            // seek_torrent();
         } else if (!strcmp(method, "POST")) {
-            post_torrent(client_sock, sock_addr, filename, sha);
+            post_torrent(client_sock, sock_addr, filename);
         } else {
             printf("[thread-%ld] Invalid message from %d client socket.", id, client_sock);
             close(client_sock);
