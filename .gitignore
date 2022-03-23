@@ -1,4 +1,7 @@
 client
 tracker
 *.out
+*.o
 .vscode
+p2p-tracker
+p2p-peer
