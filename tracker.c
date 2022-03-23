@@ -53,7 +53,10 @@ void seek_torrent(int client_sock, char id[UUID_STR_LEN]) {
             peer *next = se->head;
             char buffer[BUFFER_SIZE_MSG];
         
-            strcat(se->filename, next->address);
+            strcat(buffer, se->filename);
+            strcat(buffer, "\n");
+            strcat(buffer, se->id);
+            strcat(buffer, "\n");
 
             while (next != NULL)
             {
@@ -70,7 +73,6 @@ void seek_torrent(int client_sock, char id[UUID_STR_LEN]) {
     }
     pthread_mutex_unlock(&mutex);
 
-    close(client_sock);
 }
 
 void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[260]) {
@@ -92,20 +94,18 @@ void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[2
 
     } else {
         sprintf(buffer, "SEEK\n%s\n%s", se->id, tracker_ip);
-
+        
         bytes_written = send(client_sock, buffer, strlen(buffer), 0);
 
         if (bytes_written == ERROR)
             perror("[post_torrent] Failed to send message.");
     }
-
-    close(client_sock);
 }
 
 void *handle_connections(void *arg) {
     int client_sock, data_length;
     long id = (long) arg + 1;
-    char buffer[BUFFER_SIZE_MSG];
+    char buffer[BUFFER_SIZE_MSG] = {'\0'};
     char *method, *filename, *uuid;
     struct sockaddr_in sock_addr;
     socklen_t client_address_len = sizeof(sock_addr);
@@ -136,7 +136,7 @@ void *handle_connections(void *arg) {
 
         if (data_length == 0)
         {
-            printf("[thread-%ld] Connection closed by %d client socket.", id, client_sock);
+            printf("[thread-%ld] Connection closed by %d client socket.\n", id, client_sock);
             close(client_sock);
             continue;
         }
@@ -157,6 +157,7 @@ void *handle_connections(void *arg) {
             continue;
         }
 
+        close(client_sock);
     } while (TRUE);
     
     pthread_exit(NULL);

@@ -16,18 +16,82 @@
 
 char tracker_ip[INET_ADDRSTRLEN] = "127.0.0.1";
 
-void get_file() {
-    char buffer[BUFFER_SIZE_MSG];
-    char filename[FILENAME_MAX_LENGTH + 4];
-    char recv_buffer[BUFFER_SIZE_MSG];
+void conn_tracker(const char *send_b, char** recv_b) {
+    int sockfd;
     int bytes_written, data_length;
+    struct sockaddr_in servaddr;
+
+    /************************************************/
+    /* Configura a conexão do socket com o tracker. */
+    /************************************************/
+    
+    // printf("Digite IP do tracker:\n");
+    // fgets(tracker_ip, INET_ADDRSTRLEN, stdin);
+    // tracker_ip[strcspn(tracker_ip, "\n")] = '\0';
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    
+    if (sockfd == ERROR) {
+        perror("[conn_tracker] Failed to create socket.");
+        exit(EXIT_FAILURE);
+    }
+    
+    memset(&servaddr, 0, sizeof(servaddr));
+    inet_pton(AF_INET, tracker_ip, &(servaddr.sin_addr.s_addr));
+    servaddr.sin_port = htons(TRACKER_PORT);
+    servaddr.sin_family = AF_INET;
+    
+    if (connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) < 0) {
+        printf("[conn_tracker] connection with the tracker failed...\n");
+		close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+	
+    /************************************************/
+    /* Envia mensagem do buffer para o tracker.     */
+    /************************************************/
+    
+    bytes_written = send(sockfd, send_b, strlen(send_b), 0);
+
+    if (bytes_written == ERROR)
+    {
+        perror("[conn_tracker] Failed to send message.");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    /******************************************************/
+    /* Lê a resposta do tracker.                          */
+    /******************************************************/
+
+    data_length = recv(sockfd, *recv_b, BUFFER_SIZE_MSG, 0);
+
+    if (data_length == ERROR) {
+        perror("[conn_tracker] Failed to recieve data.");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    if (data_length == 0) {
+        perror("[conn_tracker] Connection closed by tracker.");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+        
+    close(sockfd);
+}
+
+void get_file() {
+    char buffer[BUFFER_SIZE_MSG] = {'\0'};
+    char filename[FILENAME_MAX_LENGTH + 4] = {'\0'};
+    char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
 
     /******************************************************/
     /* Lê nome do arquivo que vai compartilhar e monta    */
     /* mensagem.                                          */
     /******************************************************/
-
-    fflush(stdin);
+    
+    printf("\nNome do arquivo SEEK: ");
     fgets(filename, FILENAME_MAX_LENGTH, stdin);
     filename[strcspn(filename, "\n")] = '\0';
 
@@ -43,7 +107,7 @@ void get_file() {
         exit(EXIT_FAILURE);
     }
 
-    fread(buffer, strlen(buffer), sizeof(char), fp);
+    fread(buffer, sizeof(buffer), 1, fp);
 
     fclose(fp);
 
@@ -53,88 +117,25 @@ void get_file() {
     /******************************************************/
     
     conn_tracker(buffer, &recv_buffer);
-}
-
-
-void conn_tracker(const char *send_b, char** recv_b) {
-    int sockfd;
-    struct sockaddr_in servaddr;
-
-    /************************************************/
-    /* Configura a conexão do socket com o tracker. */
-    /************************************************/
-    
-    // printf("Digite IP do tracker:\n");
-    // fgets(tracker_ip, INET_ADDRSTRLEN, stdin);
-    // tracker_ip[strcspn(tracker_ip, "\n")] = '\0';
-
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    
-    if (sockfd == ERROR) {
-        perror("[share_file] Failed to create socket.");
-        exit(EXIT_FAILURE);
-    }
-    
-    memset(&servaddr, 0, sizeof(servaddr));
-    inet_pton(AF_INET, tracker_ip, &(servaddr.sin_addr.s_addr));
-    servaddr.sin_port = htons(TRACKER_PORT);
-    servaddr.sin_family = AF_INET;
-    
-    if (connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) < 0) {
-        printf("[share_file] connection with the tracker failed...\n");
-		close(sockfd);
-        exit(EXIT_FAILURE);
-    }
-	
-    /************************************************/
-    /* Envia mensagem POST para o tracker.          */
-    /************************************************/
-    
-    bytes_written = send(sockfd, send_b, strlen(send_b), 0);
-
-    if (bytes_written == ERROR)
-    {
-        perror("[share_file] Failed to send message.");
-        close(sockfd);
-        exit(EXIT_FAILURE);
-    }
 
     /******************************************************/
-    /* Lê a resposta do tracker.                          */
+    /* Tenta se conectar com os peers para baixar o       */ 
+    /* arquivo.                                           */
     /******************************************************/
-
-    memset(recv_b, 0, sizeof(*recv_b));
-    data_length = recv(sockfd, *recv_b, sizeof(*recv_b), 0);
-
-    if (data_length == ERROR) {
-        perror("[share_file] Failed to recieve data.");
-        close(sockfd);
-        exit(EXIT_FAILURE);
-    }
-
-    if (data_length == 0) {
-        perror("[share_file] Connection closed by tracker.");
-        close(sockfd);
-        exit(EXIT_FAILURE);
-    }
-        
-    close(sockfd);
 }
 
 void share_file() {
-    char buffer[BUFFER_SIZE_MSG];
-    char filename[FILENAME_MAX_LENGTH];
-    char recvfilename[FILENAME_MAX_LENGTH + 4];
-    char recv_buffer[BUFFER_SIZE_MSG];
-    int bytes_written, data_length;
-
+    char buffer[BUFFER_SIZE_MSG] = {'\0'};
+    char filename[FILENAME_MAX_LENGTH] = {'\0'};
+    char recvfilename[FILENAME_MAX_LENGTH + 4] = {'\0'};    
+    char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
 
     /******************************************************/
     /* Lê nome do arquivo que vai compartilhar e monta    */
     /* mensagem.                                          */
     /******************************************************/
 
-    fflush(stdin);
+    printf("\nNome do arquivo para compartilhar: ");
     fgets(filename, FILENAME_MAX_LENGTH, stdin);
     filename[strcspn(filename, "\n")] = '\0';
     sprintf(buffer, "POST\n%s", filename);
@@ -168,9 +169,10 @@ void share_file() {
         exit(EXIT_FAILURE);
     }
 
-    fwrite(buffer , sizeof(char), strlen(buffer) , fp);
+    fwrite(recv_buffer, strlen(recv_buffer), sizeof(char), fp);
 
     fclose(fp);
+    free(recv_buffer);
 }
 
 void menu() {
@@ -181,6 +183,7 @@ void menu() {
         printf("\n2 - Compartilhar arquivo"); // POST =: Entrada arquivo POST
         printf("\n3 - Sair\n");
 
+        printf("\nDigite uma opção: ");
         fgets(option, sizeof(option), stdin);
         option[strcspn(option, "\n")] = '\0';
 
