@@ -14,15 +14,51 @@
 #define LISTEN_BACKLOG 11
 #define MAX_NUM_THREADS 8
 
-int sockfd;
-struct sockaddr_in servaddr;
 char tracker_ip[INET_ADDRSTRLEN] = "127.0.0.1";
 
-void share_file() {
+void get_file() {
     char buffer[BUFFER_SIZE_MSG];
-    char filename[FILENAME_MAX_LENGTH];
-    char recvfilename[FILENAME_MAX_LENGTH + 4];
+    char filename[FILENAME_MAX_LENGTH + 4];
+    char recv_buffer[BUFFER_SIZE_MSG];
     int bytes_written, data_length;
+
+    /******************************************************/
+    /* Lê nome do arquivo que vai compartilhar e monta    */
+    /* mensagem.                                          */
+    /******************************************************/
+
+    fflush(stdin);
+    fgets(filename, FILENAME_MAX_LENGTH, stdin);
+    filename[strcspn(filename, "\n")] = '\0';
+
+    /******************************************************/
+    /* Abre e lê o arquivo SEEK torrent                   */
+    /******************************************************/
+
+    FILE *fp;
+    fp = fopen(filename, "r");
+
+    if (fp == NULL) {
+        perror("[share_file] Open file failed.");
+        exit(EXIT_FAILURE);
+    }
+
+    fread(buffer, strlen(buffer), sizeof(char), fp);
+
+    fclose(fp);
+
+    /******************************************************/
+    /* Conecta com o tracker envia mensagem e recebe      */ 
+    /* respota.                                           */
+    /******************************************************/
+    
+    conn_tracker(buffer, &recv_buffer);
+}
+
+
+void conn_tracker(const char *send_b, char** recv_b) {
+    int sockfd;
+    struct sockaddr_in servaddr;
 
     /************************************************/
     /* Configura a conexão do socket com o tracker. */
@@ -53,12 +89,8 @@ void share_file() {
     /************************************************/
     /* Envia mensagem POST para o tracker.          */
     /************************************************/
-    fflush(stdin);
-    fgets(filename, FILENAME_MAX_LENGTH, stdin);
-    filename[strcspn(filename, "\n")] = '\0';
-
-    sprintf(buffer, "POST\n%s", filename);
-    bytes_written = send(sockfd, buffer, strlen(buffer), 0);
+    
+    bytes_written = send(sockfd, send_b, strlen(send_b), 0);
 
     if (bytes_written == ERROR)
     {
@@ -71,8 +103,8 @@ void share_file() {
     /* Lê a resposta do tracker.                          */
     /******************************************************/
 
-    memset(&buffer, 0, sizeof(buffer));
-    data_length = recv(sockfd, buffer, sizeof(buffer), 0);
+    memset(recv_b, 0, sizeof(*recv_b));
+    data_length = recv(sockfd, *recv_b, sizeof(*recv_b), 0);
 
     if (data_length == ERROR) {
         perror("[share_file] Failed to recieve data.");
@@ -87,15 +119,46 @@ void share_file() {
     }
         
     close(sockfd);
+}
+
+void share_file() {
+    char buffer[BUFFER_SIZE_MSG];
+    char filename[FILENAME_MAX_LENGTH];
+    char recvfilename[FILENAME_MAX_LENGTH + 4];
+    char recv_buffer[BUFFER_SIZE_MSG];
+    int bytes_written, data_length;
+
 
     /******************************************************/
-    /* Escreve a resposta do tracker.                     */
+    /* Lê nome do arquivo que vai compartilhar e monta    */
+    /* mensagem.                                          */
+    /******************************************************/
+
+    fflush(stdin);
+    fgets(filename, FILENAME_MAX_LENGTH, stdin);
+    filename[strcspn(filename, "\n")] = '\0';
+    sprintf(buffer, "POST\n%s", filename);
+    
+    /******************************************************/
+    /* Conecta com o tracker envia mensagem e recebe      */ 
+    /* respota.                                           */
+    /******************************************************/
+    
+    conn_tracker(buffer, &recv_buffer);
+
+    /******************************************************/
+    /* Cria nome do arquivo que vai guardar respota do    */ 
+    /* tracker.                                           */
     /******************************************************/
 
     uuid_t binuuid;
     uuid_generate_random(binuuid);
     uuid_unparse(binuuid, recvfilename);
     strcat(recvfilename, ".txt");
+
+    /******************************************************/
+    /* Escreve a resposta do tracker.                     */
+    /******************************************************/
 
     FILE *fp;
     fp = fopen(recvfilename, "w");
@@ -122,7 +185,7 @@ void menu() {
         option[strcspn(option, "\n")] = '\0';
 
         if (option[0] == '1') {
-            // TODO SEEK message para o tracker
+            get_file();
         } else if (option[0] == '2') {    
             share_file();
         } else if (option[0] == '3') {
