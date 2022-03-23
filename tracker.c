@@ -64,6 +64,7 @@ void seek_torrent(int client_sock, char id[UUID_STR_LEN]) {
                 strcat(buffer, "\n");
                 next = next->next;
             }
+             strcat(buffer, "END");
             
             bytes_written = send(client_sock, buffer, strlen(buffer), 0);
 
