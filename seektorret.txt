@@ -1,3 +1,0 @@
-SEEK
-id
-tracker

@@ -16,6 +16,82 @@
 
 char tracker_ip[INET_ADDRSTRLEN] = "127.0.0.1";
 
+
+void *peer_conn(void* arg) {
+    pthread_exit(NULL);
+}
+
+void *peer_seeder(void* arg) {
+    int sockfd, status, client_sock;
+    struct sockaddr_in sock_addr;
+    long num_threads = 0;
+    pthread_t threads[MAX_NUM_THREADS];
+
+    /******************************************/
+    /* Criando o socket UDP para conexão.     */
+    /******************************************/
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sockfd == ERROR) {
+        perror("[peer_seeder] Failed to create socket.");
+        pthread_exit(NULL);
+    }
+
+    /******************************************/
+    /* Inicializa a estrutura de endereço.    */
+    /******************************************/
+
+    memset(&sock_addr, 0, sizeof(sock_addr));
+    sock_addr.sin_addr.s_addr = INADDR_ANY;
+    sock_addr.sin_port = htons(PORT);
+    sock_addr.sin_family = AF_INET;
+    
+    /******************************************/
+    /* Anexa o endereço local a um socket.    */
+    /******************************************/
+
+    status = bind(sockfd, (struct sockaddr *) &sock_addr, sizeof(sock_addr));
+    if (status == ERROR) {
+        close(sockfd);
+        perror("[peer_seeder] Bind fail.");
+        pthread_exit(NULL);
+    }
+
+    status = listen(sockfd, LISTEN_BACKLOG);
+    if (status == ERROR) {
+        perror("[peer_seeder] Listen Failed");
+        pthread_exit(NULL);
+    }
+
+    do
+    {
+        client_sock = accept(sockfd, NULL, NULL);
+        
+        if (client_sock == ERROR) {
+            perror("[peer_seeder] Accept failed.");
+            continue;
+        }
+
+        status = pthread_create(&threads[num_threads], NULL, peer_conn, (void *) num_threads);
+
+        if (status != SUCCESS) {
+            perror("[peer_seeder] failed to create thread.");
+            close(client_sock);
+            continue;
+        }
+
+        status = pthread_detach(threads[num_threads]);
+        
+        if (status != SUCCESS) {
+            perror("[peer_seeder] failed to detach thread.");
+            close(client_sock);
+            continue;
+        }
+
+    } while (TRUE);
+}
+
 void conn_tracker(const char *send_b, char **recv_b)
 {
     int sockfd;
@@ -228,6 +304,22 @@ void menu()
 
 int main(int argc, char const *argv[])
 {
+    int status;
+    pthread_t tid;
+
+    status = pthread_create(&tid, NULL, peer_seeder, NULL);
+
+    if (status != SUCCESS) {
+        perror("[main] failed to create thread.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    status = pthread_detach(tid);
+    
+    if (status != SUCCESS) {
+        perror("[main] pthread detach failed.");
+    }
+
     menu();
     return 0;
 }
