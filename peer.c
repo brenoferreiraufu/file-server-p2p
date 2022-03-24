@@ -13,27 +13,113 @@
 #define TRACKER_PORT 49154
 #define LISTEN_BACKLOG 11
 #define MAX_NUM_THREADS 8
+#define FILE_NOT_FOUND "FAIL\nnot-found\n"
+
+typedef struct file_info {
+    char filename[FILENAME_MAX_LENGTH];
+    char id[UUID_STR_LEN];
+} file_info;
 
 char tracker_ip[INET_ADDRSTRLEN] = "127.0.0.1";
+long num_threads = 0;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+int seederfd, finfo_size = 0;
+file_info finfo[30];
 
+void send_file(int client_fd, int fd)
+{
+    char buffer[BUFFER_SIZE_FILE];
+    int bytes_read;
+
+    do
+    {
+        memset(&buffer, 0, sizeof(buffer));
+        bytes_read = read(fd, buffer, BUFFER_SIZE_FILE);
+        if (bytes_read > 0)
+        {
+            send(client_fd, buffer, bytes_read, 0);
+        }
+    } while (bytes_read > 0);
+
+    close(fd);
+}
 
 void *peer_conn(void* arg) {
+    int client_fd = (long) arg;
+    int data_length = 0;
+    char buffer[BUFFER_SIZE_MSG] = {'\0'};
+    int index_file = 0;
+
+    data_length = recv(client_fd, buffer, BUFFER_SIZE_MSG, 0);
+
+    if (data_length == ERROR)
+    {
+        perror("[conn_tracker] Failed to recieve data.");
+        close(client_fd);
+        pthread_mutex_lock(&mutex);
+        num_threads--;
+        pthread_mutex_unlock(&mutex);
+        pthread_exit(NULL);
+    }
+
+    if (data_length == 0)
+    {
+        perror("[conn_tracker] Connection closed by tracker.");
+        close(client_fd);
+        pthread_mutex_lock(&mutex);
+        num_threads--;
+        pthread_mutex_unlock(&mutex);
+        pthread_exit(NULL);
+    }
+
+    for (index_file = 0; index_file < finfo_size; index_file++)
+    {
+        if (!strcmp(finfo[index_file].id, buffer))
+            break;
+    }
+    
+    if (index_file >= finfo_size) {
+        perror("[conn_tracker] File not found.");
+
+        int bytes_written = send(client_fd, FILE_NOT_FOUND, strlen(FILE_NOT_FOUND), 0);
+
+        if (bytes_written == ERROR)
+        {
+            perror("[conn_tracker] Failed to send message.");
+        }
+
+
+        close(client_fd);
+        pthread_mutex_lock(&mutex);
+        num_threads--;
+        pthread_mutex_unlock(&mutex);
+        pthread_exit(NULL);
+    }
+
+    int fp = open(finfo[index_file].filename, O_RDONLY);
+
+    send_file(client_fd, fp);
+
+    pthread_mutex_lock(&mutex);
+    num_threads--;
+    pthread_mutex_unlock(&mutex);
+    
+    close(client_fd);
     pthread_exit(NULL);
 }
 
 void *peer_seeder(void* arg) {
-    int sockfd, status, client_sock;
+    int status, client_sock;
     struct sockaddr_in sock_addr;
-    long num_threads = 0;
     pthread_t threads[MAX_NUM_THREADS];
 
     /******************************************/
     /* Criando o socket UDP para conexão.     */
     /******************************************/
 
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    seederfd = socket(AF_INET, SOCK_STREAM, 0);
 
-    if (sockfd == ERROR) {
+    if (seederfd == ERROR) {
         perror("[peer_seeder] Failed to create socket.");
         pthread_exit(NULL);
     }
@@ -51,14 +137,14 @@ void *peer_seeder(void* arg) {
     /* Anexa o endereço local a um socket.    */
     /******************************************/
 
-    status = bind(sockfd, (struct sockaddr *) &sock_addr, sizeof(sock_addr));
+    status = bind(seederfd, (struct sockaddr *) &sock_addr, sizeof(sock_addr));
     if (status == ERROR) {
-        close(sockfd);
+        close(seederfd);
         perror("[peer_seeder] Bind fail.");
         pthread_exit(NULL);
     }
 
-    status = listen(sockfd, LISTEN_BACKLOG);
+    status = listen(seederfd, LISTEN_BACKLOG);
     if (status == ERROR) {
         perror("[peer_seeder] Listen Failed");
         pthread_exit(NULL);
@@ -66,20 +152,29 @@ void *peer_seeder(void* arg) {
 
     do
     {
-        client_sock = accept(sockfd, NULL, NULL);
-        
+        pthread_mutex_lock(&mutex);
+        if (num_threads >= MAX_NUM_THREADS) {
+            continue;
+        }
+        pthread_mutex_unlock(&mutex);
+
+        client_sock = accept(seederfd, NULL, NULL);
+
         if (client_sock == ERROR) {
             perror("[peer_seeder] Accept failed.");
             continue;
         }
 
-        status = pthread_create(&threads[num_threads], NULL, peer_conn, (void *) num_threads);
+        pthread_mutex_lock(&mutex);
+        status = pthread_create(&threads[num_threads], NULL, peer_conn, (void *) &client_sock);
 
         if (status != SUCCESS) {
             perror("[peer_seeder] failed to create thread.");
             close(client_sock);
             continue;
         }
+
+        num_threads++;
 
         status = pthread_detach(threads[num_threads]);
         
@@ -88,6 +183,8 @@ void *peer_seeder(void* arg) {
             close(client_sock);
             continue;
         }
+
+        pthread_mutex_unlock(&mutex);
 
     } while (TRUE);
 }
@@ -187,7 +284,7 @@ void get_file()
 
     if (fp == NULL)
     {
-        perror("[share_file] Open file failed.");
+        perror("[get_file] Open file failed.");
         exit(EXIT_FAILURE);
     }
 
@@ -212,11 +309,10 @@ void get_file()
     id = strtok(NULL, "\n");
     puts(id);
     address = strtok(NULL, "\n");
-    puts(address);
 
     while (strcmp(address, "END"))
     {
-        
+        // TODO
         address = strtok(NULL, "\n");
     }
 }
@@ -227,6 +323,8 @@ void share_file()
     char filename[FILENAME_MAX_LENGTH] = {'\0'};
     char recvfilename[FILENAME_MAX_LENGTH + 4] = {'\0'};
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
+
+    /* Create table; no error checking is performed. */
 
     /******************************************************/
     /* Lê nome do arquivo que vai compartilhar e monta    */
@@ -271,6 +369,13 @@ void share_file()
     fwrite(recv_buffer, strlen(recv_buffer), sizeof(char), fp);
 
     fclose(fp);
+
+    strtok(recv_buffer, "\n");
+    char *id = strtok(NULL, "\n");
+    strcpy(finfo[finfo_size].filename, filename);
+    strcpy(finfo[finfo_size].id, id);
+    finfo_size++;
+
     free(recv_buffer);
 }
 
