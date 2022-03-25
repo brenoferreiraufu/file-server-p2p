@@ -14,7 +14,6 @@
 #define LISTEN_BACKLOG 11
 #define MAX_NUM_THREADS 8
 #define FILE_NOT_FOUND "FAIL\nnot-found\n"
-#define ADD_PEER_MSG "ADD\n"
 
 typedef struct file_info {
     char filename[FILENAME_MAX_LENGTH];
@@ -239,10 +238,11 @@ void conn_tracker(const char *send_b, char **recv_b)
 void get_file()
 {
     char buffer[BUFFER_SIZE_MSG] = {'\0'};
+    char add_msg[BUFFER_SIZE_MSG] = {'\0'};
     char seekfile[FILENAME_MAX_LENGTH + 4] = {'\0'};
     char fbuffer[BUFFER_SIZE_FILE] = {'\0'};
     int bytes_read;
-    char *filename, *address;
+    char *filename, *id, *address;
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
     int sockfd, trackersockfd;
     int bytes_written, data_length;
@@ -293,7 +293,7 @@ void get_file()
     /******************************************************/
 
     filename = strtok(recv_buffer, "\n");
-    strtok(NULL, "\n");
+    id = strtok(NULL, "\n");
     address = strtok(NULL, "\n");
 
     while (strcmp(address, "END"))
@@ -394,11 +394,12 @@ void get_file()
             break;
         }
 
-        bytes_written = send(trackersockfd, ADD_PEER_MSG, strlen(ADD_PEER_MSG), 0);
+        sprintf(add_msg, "ADD\n%s", id);
+        bytes_written = send(trackersockfd, add_msg, strlen(add_msg), 0);
 
         if (bytes_written == ERROR)
         {
-            perror("[get_file] Failed to send ADD_PEER_MSG message.");
+            perror("[get_file] Failed to send add_msg message.");
             close(trackersockfd);
             break;
         }
