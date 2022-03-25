@@ -14,6 +14,7 @@
 #define LISTEN_BACKLOG 11
 #define MAX_NUM_THREADS 8
 #define FILE_NOT_FOUND "FAIL\nnot-found\n"
+#define ADD_PEER_MSG "ADD\n"
 
 typedef struct file_info {
     char filename[FILENAME_MAX_LENGTH];
@@ -38,6 +39,24 @@ void send_file(int client_fd, int fd)
         if (bytes_read > 0)
         {
             send(client_fd, buffer, bytes_read, 0);
+        }
+    } while (bytes_read > 0);
+
+    close(fd);
+}
+
+void recv_file(int peer_fd, int fd)
+{
+    char buffer[BUFFER_SIZE_FILE];
+    int bytes_read;
+
+    do
+    {
+        memset(&buffer, 0, sizeof(buffer));
+        bytes_read = recv(peer_fd, buffer, BUFFER_SIZE_MSG, 0);
+        if (bytes_read > 0)
+        {
+            write(fd, buffer, bytes_read);
         }
     } while (bytes_read > 0);
 
@@ -265,6 +284,15 @@ void get_file()
     char seekfile[FILENAME_MAX_LENGTH + 4] = {'\0'};
     char *filename, *id, *address;
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
+    int sockfd;
+    int bytes_written, data_length;
+    struct sockaddr_in peeraddr;
+    struct sockaddr_in trackeraddr;
+
+    memset(&trackeraddr, 0, sizeof(trackeraddr));
+    inet_pton(AF_INET, tracker_ip, &(trackeraddr.sin_addr.s_addr));
+    trackeraddr.sin_port = htons(TRACKER_PORT);
+    trackeraddr.sin_family = AF_INET;
 
     /******************************************************/
     /* Lê nome do arquivo que vai compartilhar e monta    */
@@ -312,8 +340,80 @@ void get_file()
 
     while (strcmp(address, "END"))
     {
-        // TODO
-        address = strtok(NULL, "\n");
+        sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+        if (sockfd == ERROR)
+        {
+            perror("[conn_tracker] Failed to create socket.");
+            exit(EXIT_FAILURE);
+        }
+
+        memset(&peeraddr, 0, sizeof(peeraddr));
+        inet_pton(AF_INET, address, &(peeraddr.sin_addr.s_addr));
+        peeraddr.sin_port = htons(PORT);
+        peeraddr.sin_family = AF_INET;
+
+        if (connect(sockfd, (struct sockaddr *)&peeraddr, sizeof(peeraddr)) < 0)
+        {
+            printf("[get_file] connection with peer failed...\n");
+            address = strtok(NULL, "\n");
+            continue;
+        }
+
+        /*********************************************************/
+        /* Envia mensagem com o nome do arquivo para o peer.     */
+        /*********************************************************/
+
+        bytes_written = send(sockfd, filename, strlen(filename), 0);
+
+        if (bytes_written == ERROR)
+        {
+            perror("[get_file] Failed to send filname message.");
+            close(sockfd);
+            exit(EXIT_FAILURE);
+        }
+
+        /******************************************************/
+        /* Recebe o arquivo do peer                           */
+        /******************************************************/
+
+        int fp = open(filename, O_WRONLY);
+
+        recv_file(sockfd, fp);
+        printf("[get_file] File received\n");
+
+        if (connect(sockfd, (struct sockaddr *)&trackeraddr, sizeof(trackeraddr)) < 0)
+        {
+            printf("[get_file] connection with tracker failed, cannot add peer...\n");
+            close(sockfd);
+            break;
+        }
+
+        bytes_written = send(sockfd, ADD_PEER_MSG, strlen(ADD_PEER_MSG), 0);
+
+        if (bytes_written == ERROR)
+        {
+            perror("[get_file] Failed to send ADD_PEER_MSG message.");
+            close(sockfd);
+            break;
+        }
+
+        /******************************************************/
+        /* Lê a resposta do tracker "OK".                     */
+        /******************************************************/
+
+        data_length = recv(sockfd, recv_buffer, BUFFER_SIZE_MSG, 0);
+
+        if (data_length == ERROR)
+        {
+            perror("[get_file] Failed to recieve ADD_PEER response from tracker.");
+            close(sockfd);
+            break;
+        }
+
+        puts(recv_buffer);
+
+        close(sockfd);
     }
 }
 

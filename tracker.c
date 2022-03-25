@@ -14,6 +14,7 @@
 
 #define LIST_INSERT_FAILED "FAIL\nno-space\n"
 #define TORRENT_NOT_FOUND "FAIL\nnot-found\n"
+#define ADD_PEER_SUCCESS "SUCCESS\npeer-added\n"
 
 int sock, status;
 const char *tracker_ip;
@@ -71,6 +72,34 @@ void seek_torrent(int client_sock, char id[UUID_STR_LEN]) {
             if (bytes_written == ERROR)
                 perror("[seek_torrent] Failed to send message.");
         }
+    }
+    pthread_mutex_unlock(&mutex);
+
+}
+
+void add_peer_to_session(int client_sock, char id[UUID_STR_LEN], struct sockaddr_in sock_addr) {
+    int bytes_written;
+    char address[INET_ADDRSTRLEN];
+    session *se;
+
+    inet_ntop(AF_INET, &(sock_addr.sin_addr), address, INET_ADDRSTRLEN); // converte para string
+
+    pthread_mutex_lock(&mutex);
+    se = get_session_by_id(li, id);
+
+    if (se == NULL) {
+        bytes_written = send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+
+        if (bytes_written == ERROR)
+            perror("[add_peer_to_session] Failed to send not found message.");
+
+    } else {
+        insert_peer(se, address);
+        
+        bytes_written = send(client_sock, ADD_PEER_SUCCESS, strlen(ADD_PEER_SUCCESS), 0);
+
+        if (bytes_written == ERROR)
+            perror("[add_peer_to_session] Failed to send ADD_PEER_SUCCESS message.");
     }
     pthread_mutex_unlock(&mutex);
 
@@ -152,6 +181,9 @@ void *handle_connections(void *arg) {
         } else if (!strcmp(method, "POST")) {
             filename = strtok(NULL, "\n");
             post_torrent(client_sock, sock_addr, filename);
+        } else if (!strcmp(method, "ADD")) {
+            uuid = strtok(NULL, "\n");
+            add_peer_to_session(client_sock, uuid, sock_addr);
         } else {
             printf("[thread-%ld] Invalid message from %d client socket.", id, client_sock);
             close(client_sock);
