@@ -21,7 +21,7 @@ typedef struct file_info {
     char id[UUID_STR_LEN];
 } file_info;
 
-char tracker_ip[INET_ADDRSTRLEN] = "127.0.0.1";
+char tracker_ip[INET_ADDRSTRLEN] = "192.168.100.192";
 long num_threads = 0;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 int seederfd, finfo_size = 0;
@@ -56,6 +56,7 @@ void recv_file(int peer_fd, int fd)
         bytes_read = recv(peer_fd, buffer, BUFFER_SIZE_MSG, 0);
         if (bytes_read > 0)
         {
+            print("[recv_file] write....\n");
             write(fd, buffer, bytes_read);
         }
     } while (bytes_read > 0);
@@ -344,7 +345,7 @@ void get_file()
 
         if (sockfd == ERROR)
         {
-            perror("[conn_tracker] Failed to create socket.");
+            perror("[get_file] Failed to create socket.");
             exit(EXIT_FAILURE);
         }
 
@@ -380,8 +381,9 @@ void get_file()
         int fp = open(filename, O_WRONLY);
 
         recv_file(sockfd, fp);
-        printf("[get_file] File received\n");
+        printf("[get_file] File received >>%s<<\n", filename);
 
+        // TODO CRIAR OUTRO SOCKER PRA COMUNICAR COM O TRACKER \/ ERRO
         if (connect(sockfd, (struct sockaddr *)&trackeraddr, sizeof(trackeraddr)) < 0)
         {
             printf("[get_file] connection with tracker failed, cannot add peer...\n");
