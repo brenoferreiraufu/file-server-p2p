@@ -103,6 +103,7 @@ void add_peer_to_session(int client_sock, char id[UUID_STR_LEN], struct sockaddr
     }
     pthread_mutex_unlock(&mutex);
 
+    printf("[add_peer_to_session] PEER ADICIONADO\n");
 }
 
 void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[260]) {

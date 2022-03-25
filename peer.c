@@ -38,6 +38,7 @@ void send_file(int client_fd, int fd)
         bytes_read = read(fd, buffer, BUFFER_SIZE_FILE);
         if (bytes_read > 0)
         {
+            printf("[send_file] send....\n");
             send(client_fd, buffer, bytes_read, 0);
         }
     } while (bytes_read > 0);
@@ -59,6 +60,7 @@ void recv_file(int peer_fd, int fd)
             printf("[recv_file] write....\n");
             write(fd, buffer, bytes_read);
         }
+        printf("[recv_file] bytes_read <= 0\n");
     } while (bytes_read > 0);
 
     close(fd);
@@ -115,6 +117,8 @@ void *peer_conn(void* arg) {
         pthread_mutex_unlock(&mutex);
         pthread_exit(NULL);
     }
+
+    printf("\n");
 
     int fp = open(finfo[index_file].filename, O_RDONLY);
 
@@ -385,7 +389,6 @@ void get_file()
 
         trackersockfd = socket(AF_INET, SOCK_STREAM, 0);
 
-        // TODO CRIAR OUTRO SOCKER PRA COMUNICAR COM O TRACKER \/ ERRO
         if (connect(trackersockfd, (struct sockaddr *)&trackeraddr, sizeof(trackeraddr)) < 0)
         {
             printf("[get_file] connection with tracker failed, cannot add peer...\n");
@@ -418,7 +421,8 @@ void get_file()
             break;
         }
 
-        puts(recv_buffer);
+        printf("[get_file] PEER ADICIONADO\n");
+        printf("%s\n", recv_buffer);
 
         close(trackersockfd);
         close(sockfd);
