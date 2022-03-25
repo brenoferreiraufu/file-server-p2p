@@ -86,10 +86,7 @@ void *peer_conn(void* arg) {
             bytes_read = read(fp, fbuffer, BUFFER_SIZE_FILE);
             if (bytes_read > 0)
             {
-                printf("[send_file] send....\n");
                 send(client_sock, fbuffer, bytes_read, 0);
-            } else {
-                printf("[send_file] bytes read <= 0\n");
             }
         } while (bytes_read > 0);
 
@@ -368,13 +365,13 @@ void get_file()
                 exit(EXIT_FAILURE);
             }
 
-            if (bytes_written <= 0)
+            /*if (bytes_written <= 0)
             {
                 perror("[get_file] Failed to write data.\n");
                 fclose(file);
                 close(sockfd);
                 exit(EXIT_FAILURE);
-            }
+            }*/
 
         } while (TRUE);
 
@@ -417,12 +414,11 @@ void share_file()
     fgets(filename, FILENAME_MAX_LENGTH, stdin);
     filename[strcspn(filename, "\n")] = '\0';
     sprintf(buffer, "POST\n%s", filename);
-    fflush(stdin);
 
-    printf("Digite IP do tracker: ");
+    printf("\nDigite IP do tracker: ");
     fgets(tracker_ip, INET_ADDRSTRLEN, stdin);
     tracker_ip[strcspn(tracker_ip, "\n")] = '\0';
-    fflush(stdin);
+    getc();
 
     /******************************************************/
     /* Conecta com o tracker envia mensagem e recebe      */
