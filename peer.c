@@ -241,6 +241,7 @@ void get_file()
     int bytes_read;
     char *filename, *id, *address;
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
+    char *recv_buffer2 = calloc(BUFFER_SIZE_MSG, 1);
     int sockfd;
     int bytes_written;
     struct sockaddr_in peeraddr;
@@ -382,12 +383,11 @@ void get_file()
         printf("[get_file] File received >>%s<<\n", filename);
 
         sprintf(add_msg, "ADD\n%s", id);
-        memset(&recv_buffer, 0, sizeof(recv_buffer));
-        conn_tracker(add_msg, &recv_buffer, ip_tracker);
+        conn_tracker(add_msg, &recv_buffer2, ip_tracker);
 
-        if (!strcmp(recv_buffer, ADD_PEER_SUCCESS)) {
+        if (!strcmp(recv_buffer2, ADD_PEER_SUCCESS)) {
             printf("[get_file] PEER ADICIONADO\n");
-            printf("%s\n", recv_buffer);
+            printf("%s\n", recv_buffer2);
         } else {
             printf("[get_file] PEER NÃO ADICIONADO\n");
         }
@@ -395,7 +395,7 @@ void get_file()
         break;
     }
 
-    free(recv_buffer);
+    free(recv_buffer2);
 }
 
 void share_file()
@@ -417,10 +417,12 @@ void share_file()
     fgets(filename, FILENAME_MAX_LENGTH, stdin);
     filename[strcspn(filename, "\n")] = '\0';
     sprintf(buffer, "POST\n%s", filename);
+    fflush(stdin);
 
     printf("Digite IP do tracker: ");
     fgets(tracker_ip, INET_ADDRSTRLEN, stdin);
     tracker_ip[strcspn(tracker_ip, "\n")] = '\0';
+    fflush(stdin);
 
     /******************************************************/
     /* Conecta com o tracker envia mensagem e recebe      */
