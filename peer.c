@@ -56,7 +56,7 @@ void recv_file(int peer_fd, int fd)
         bytes_read = recv(peer_fd, buffer, BUFFER_SIZE_MSG, 0);
         if (bytes_read > 0)
         {
-            print("[recv_file] write....\n");
+            printf("[recv_file] write....\n");
             write(fd, buffer, bytes_read);
         }
     } while (bytes_read > 0);
