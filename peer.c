@@ -67,7 +67,7 @@ void recv_file(int peer_fd, int fd)
 }
 
 void *peer_conn(void* arg) {
-    int client_fd = (long) arg;
+    int client_fd = *(int *) arg;
     int data_length = 0;
     char buffer[BUFFER_SIZE_MSG] = {'\0'};
     int index_file = 0;
