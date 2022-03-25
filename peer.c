@@ -334,8 +334,7 @@ void get_file()
         /******************************************************/
         /* Recebe o arquivo do peer                           */
         /******************************************************/
-
-        file = fopen(filename, "w");
+        FILE *file = fopen(filename, "w");
 
         if (file == NULL)
         {
