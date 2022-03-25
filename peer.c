@@ -327,30 +327,61 @@ void get_file()
         if (bytes_written == ERROR)
         {
             perror("[get_file] Failed to send filname message.");
-            close(sockfd);
-            exit(EXIT_FAILURE);
+            address = strtok(NULL, "\n");
+            continue;
         }
 
         /******************************************************/
         /* Recebe o arquivo do peer                           */
         /******************************************************/
 
-        int fp = open(filename, O_WRONLY);
+        file = fopen(filename, "w");
+
+        if (file == NULL)
+        {
+            perror("[get_file] File write dont work.\n");
+            close(sockfd);
+            exit(EXIT_FAILURE);
+        }
 
         do
         {
-            memset(&fbuffer, 0, sizeof(fbuffer));
-            bytes_read = recv(sockfd, fbuffer, BUFFER_SIZE_MSG, 0);
-            if (bytes_read > 0)
-            {
-                printf("[recv_file] write....\n");
-                write(fp, fbuffer, bytes_read);
-            } else {
-                printf("[recv_file] bytes_read <= 0\n");
-            }
-        } while (bytes_read > 0);
+            bytes_read = recv(sockfd, fbuffer, BUFFER_SIZE_FILE, 0);
 
-        close(fp);
+            if (bytes_read == ERROR)
+            {
+                perror("[get_file] Failed to recieve file.");
+                fclose(file);
+                close(sockfd);
+                exit(EXIT_FAILURE);
+            }
+
+            if (bytes_read <= 0)
+            {
+                fclose(file);
+                break;
+            }
+
+            bytes_written = fwrite(fbuffer, sizeof(char), strlen(fbuffer), file);
+            
+            if (ferror(file))
+            {
+                perror("[get_file] ERROR writing to file\n");
+                fclose(file);
+                close(sockfd);
+                exit(EXIT_FAILURE);
+            }
+
+            if (bytes_written <= 0)
+            {
+                perror("[get_file] Failed to write data.\n");
+                fclose(file);
+                close(sockfd);
+                exit(EXIT_FAILURE);
+            }
+
+        } while (TRUE);
+
         close(sockfd);
 
         printf("[get_file] File received >>%s<<\n", filename);
