@@ -76,7 +76,7 @@ void *peer_conn(void* arg) {
 
     if (data_length == ERROR)
     {
-        perror("[conn_tracker] Failed to recieve data.");
+        perror("[peer_conn] Failed to recieve data.");
         close(client_fd);
         pthread_mutex_lock(&mutex);
         num_threads--;
@@ -86,7 +86,7 @@ void *peer_conn(void* arg) {
 
     if (data_length == 0)
     {
-        perror("[conn_tracker] Connection closed by tracker.");
+        perror("[peer_conn] Connection closed by tracker.");
         close(client_fd);
         pthread_mutex_lock(&mutex);
         num_threads--;
@@ -101,13 +101,13 @@ void *peer_conn(void* arg) {
     }
     
     if (index_file >= finfo_size) {
-        perror("[conn_tracker] File not found.");
+        perror("[peer_conn] File not found.");
 
         int bytes_written = send(client_fd, FILE_NOT_FOUND, strlen(FILE_NOT_FOUND), 0);
 
         if (bytes_written == ERROR)
         {
-            perror("[conn_tracker] Failed to send message.");
+            perror("[peer_conn] Failed to send message.");
         }
 
 

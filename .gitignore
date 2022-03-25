@@ -2,6 +2,7 @@ client
 tracker
 *.out
 *.o
+*.txt
 .vscode
 p2p-tracker
 p2p-peer
