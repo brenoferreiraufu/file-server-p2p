@@ -342,7 +342,7 @@ void get_file()
             memset(&fbuffer, 0, sizeof(fbuffer));
             bytes_read = recv(sockfd, fbuffer, BUFFER_SIZE_FILE, 0);
             if (bytes_read > 0) {
-                write(fbuffer, 1, bytes_read, file);
+                fwrite(fbuffer, 1, bytes_read, file);
             }
         } while (bytes_read > 0);
 
