@@ -27,113 +27,83 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 int seederfd, finfo_size = 0;
 file_info finfo[30];
 
-void send_file(int client_fd, int fd)
-{
-    char buffer[BUFFER_SIZE_FILE];
-    int bytes_read;
-
-    do
-    {
-        memset(&buffer, 0, sizeof(buffer));
-        bytes_read = read(fd, buffer, BUFFER_SIZE_FILE);
-        if (bytes_read > 0)
-        {
-            printf("[send_file] send....\n");
-            send(client_fd, buffer, bytes_read, 0);
-        }
-    } while (bytes_read > 0);
-
-    close(fd);
-}
-
-void recv_file(int peer_fd, int fd)
-{
-    char buffer[BUFFER_SIZE_FILE];
-    int bytes_read;
-
-    do
-    {
-        memset(&buffer, 0, sizeof(buffer));
-        bytes_read = recv(peer_fd, buffer, BUFFER_SIZE_MSG, 0);
-        if (bytes_read > 0)
-        {
-            printf("[recv_file] write....\n");
-            write(fd, buffer, bytes_read);
-        }
-        printf("[recv_file] bytes_read <= 0\n");
-    } while (bytes_read > 0);
-
-    close(fd);
-}
-
 void *peer_conn(void* arg) {
-    int client_fd = *(int *) arg;
+    int client_sock;
+    int bytes_read;
     int data_length = 0;
     char buffer[BUFFER_SIZE_MSG] = {'\0'};
+    char fbuffer[BUFFER_SIZE_FILE] = {'\0'};
     int index_file = 0;
 
-    data_length = recv(client_fd, buffer, BUFFER_SIZE_MSG, 0);
+    do {
+        client_sock = accept(seederfd, NULL, NULL);
 
-    if (data_length == ERROR)
-    {
-        perror("[peer_conn] Failed to recieve data.");
-        close(client_fd);
-        pthread_mutex_lock(&mutex);
-        num_threads--;
-        pthread_mutex_unlock(&mutex);
-        pthread_exit(NULL);
-    }
-
-    if (data_length == 0)
-    {
-        perror("[peer_conn] Connection closed by tracker.");
-        close(client_fd);
-        pthread_mutex_lock(&mutex);
-        num_threads--;
-        pthread_mutex_unlock(&mutex);
-        pthread_exit(NULL);
-    }
-
-    for (index_file = 0; index_file < finfo_size; index_file++)
-    {
-        if (!strcmp(finfo[index_file].id, buffer))
-            break;
-    }
-    
-    if (index_file >= finfo_size) {
-        perror("[peer_conn] File not found.");
-
-        int bytes_written = send(client_fd, FILE_NOT_FOUND, strlen(FILE_NOT_FOUND), 0);
-
-        if (bytes_written == ERROR)
-        {
-            perror("[peer_conn] Failed to send message.");
+        if (client_sock == ERROR) {
+            perror("[peer_seeder] Accept failed.");
+            continue;
         }
 
+        data_length = recv(client_sock, buffer, BUFFER_SIZE_MSG, 0);
 
-        close(client_fd);
-        pthread_mutex_lock(&mutex);
-        num_threads--;
-        pthread_mutex_unlock(&mutex);
-        pthread_exit(NULL);
-    }
+        if (data_length == ERROR)
+        {
+            perror("[peer_conn] Failed to recieve data.");
+            close(client_sock);
+            continue;
+        }
 
-    printf("\n");
+        if (data_length == 0)
+        {
+            perror("[peer_conn] Connection closed by tracker.");
+            close(client_sock);
+            continue;
+        }
 
-    int fp = open(finfo[index_file].filename, O_RDONLY);
+        for (index_file = 0; index_file < finfo_size; index_file++)
+        {
+            if (!strcmp(finfo[index_file].filename, buffer))
+                break;
+        }
 
-    send_file(client_fd, fp);
+        if (index_file >= finfo_size) {
+            perror("[peer_conn] File not found.");
 
-    pthread_mutex_lock(&mutex);
-    num_threads--;
-    pthread_mutex_unlock(&mutex);
+            int bytes_written = send(client_sock, FILE_NOT_FOUND, strlen(FILE_NOT_FOUND), 0);
+
+            if (bytes_written == ERROR)
+            {
+                perror("[peer_conn] Failed to send message.");
+            }
+
+            close(client_sock);
+            continue;
+        }
+
+        int fp = open(finfo[index_file].filename, O_RDONLY);
+
+        do
+        {
+            memset(&fbuffer, 0, sizeof(fbuffer));
+            bytes_read = read(fp, fbuffer, BUFFER_SIZE_FILE);
+            if (bytes_read > 0)
+            {
+                printf("[send_file] send....\n");
+                send(client_sock, fbuffer, bytes_read, 0);
+            } else {
+                printf("[send_file] bytes read <= 0\n");
+            }
+        } while (bytes_read > 0);
+
+        close(fp);
+        
+        close(client_sock);
+    } while(TRUE);
     
-    close(client_fd);
     pthread_exit(NULL);
 }
 
 void *peer_seeder(void* arg) {
-    int status, client_sock;
+    int status;
     struct sockaddr_in sock_addr;
     pthread_t threads[MAX_NUM_THREADS];
 
@@ -170,47 +140,28 @@ void *peer_seeder(void* arg) {
 
     status = listen(seederfd, LISTEN_BACKLOG);
     if (status == ERROR) {
+        close(seederfd);
         perror("[peer_seeder] Listen Failed");
         pthread_exit(NULL);
     }
 
     do
     {
-        pthread_mutex_lock(&mutex);
-        if (num_threads >= MAX_NUM_THREADS) {
-            continue;
-        }
-        pthread_mutex_unlock(&mutex);
-
-        client_sock = accept(seederfd, NULL, NULL);
-
-        if (client_sock == ERROR) {
-            perror("[peer_seeder] Accept failed.");
-            continue;
-        }
-
-        pthread_mutex_lock(&mutex);
-        status = pthread_create(&threads[num_threads], NULL, peer_conn, (void *) &client_sock);
+        status = pthread_create(&threads[num_threads], NULL, peer_conn, (void *) num_threads);
 
         if (status != SUCCESS) {
             perror("[peer_seeder] failed to create thread.");
-            close(client_sock);
             continue;
         }
-
-        num_threads++;
 
         status = pthread_detach(threads[num_threads]);
         
         if (status != SUCCESS) {
             perror("[peer_seeder] failed to detach thread.");
-            close(client_sock);
             continue;
         }
 
-        pthread_mutex_unlock(&mutex);
-
-    } while (TRUE);
+    } while (++num_threads < MAX_NUM_THREADS);
 }
 
 void conn_tracker(const char *send_b, char **recv_b)
@@ -287,6 +238,8 @@ void get_file()
 {
     char buffer[BUFFER_SIZE_MSG] = {'\0'};
     char seekfile[FILENAME_MAX_LENGTH + 4] = {'\0'};
+    char fbuffer[BUFFER_SIZE_FILE] = {'\0'};
+    int bytes_read;
     char *filename, *id, *address;
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
     int sockfd, trackersockfd;
@@ -338,9 +291,7 @@ void get_file()
     /******************************************************/
 
     filename = strtok(recv_buffer, "\n");
-    puts(filename);
     id = strtok(NULL, "\n");
-    puts(id);
     address = strtok(NULL, "\n");
 
     while (strcmp(address, "END"))
@@ -384,7 +335,22 @@ void get_file()
 
         int fp = open(filename, O_WRONLY);
 
-        recv_file(sockfd, fp);
+        do
+        {
+            memset(&fbuffer, 0, sizeof(fbuffer));
+            bytes_read = recv(sockfd, fbuffer, BUFFER_SIZE_MSG, 0);
+            if (bytes_read > 0)
+            {
+                printf("[recv_file] write....\n");
+                write(fd, fbuffer, bytes_read);
+            } else {
+                printf("[recv_file] bytes_read <= 0\n");
+            }
+        } while (bytes_read > 0);
+
+        close(fd);
+        close(sockfd);
+
         printf("[get_file] File received >>%s<<\n", filename);
 
         trackersockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -397,13 +363,12 @@ void get_file()
             break;
         }
 
-        bytes_written = send(sockfd, ADD_PEER_MSG, strlen(ADD_PEER_MSG), 0);
+        bytes_written = send(trackersockfd, ADD_PEER_MSG, strlen(ADD_PEER_MSG), 0);
 
         if (bytes_written == ERROR)
         {
             perror("[get_file] Failed to send ADD_PEER_MSG message.");
             close(trackersockfd);
-            close(sockfd);
             break;
         }
 
@@ -411,13 +376,12 @@ void get_file()
         /* Lê a resposta do tracker "OK".                     */
         /******************************************************/
 
-        data_length = recv(sockfd, recv_buffer, BUFFER_SIZE_MSG, 0);
+        data_length = recv(trackersockfd, recv_buffer, BUFFER_SIZE_MSG, 0);
 
         if (data_length == ERROR)
         {
             perror("[get_file] Failed to recieve ADD_PEER response from tracker.");
             close(trackersockfd);
-            close(sockfd);
             break;
         }
 
@@ -425,7 +389,6 @@ void get_file()
         printf("%s\n", recv_buffer);
 
         close(trackersockfd);
-        close(sockfd);
     }
 }
 
