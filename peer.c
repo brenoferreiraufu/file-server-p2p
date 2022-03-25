@@ -421,7 +421,7 @@ void get_file()
         break;
     }
 
-    free(recv_buffer1);
+    free(recv_buffer);
     free(recv_buffer2);
     free(recv_buffer3);
 }
