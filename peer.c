@@ -162,6 +162,8 @@ void *peer_seeder(void* arg) {
         }
 
     } while (++num_threads < MAX_NUM_THREADS);
+
+    while(TRUE);
 }
 
 void conn_tracker(const char *send_b, char **recv_b)
@@ -240,7 +242,7 @@ void get_file()
     char seekfile[FILENAME_MAX_LENGTH + 4] = {'\0'};
     char fbuffer[BUFFER_SIZE_FILE] = {'\0'};
     int bytes_read;
-    char *filename, *id, *address;
+    char *filename, *address;
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
     int sockfd, trackersockfd;
     int bytes_written, data_length;
@@ -291,7 +293,7 @@ void get_file()
     /******************************************************/
 
     filename = strtok(recv_buffer, "\n");
-    id = strtok(NULL, "\n");
+    strtok(NULL, "\n");
     address = strtok(NULL, "\n");
 
     while (strcmp(address, "END"))
@@ -342,13 +344,13 @@ void get_file()
             if (bytes_read > 0)
             {
                 printf("[recv_file] write....\n");
-                write(fd, fbuffer, bytes_read);
+                write(fp, fbuffer, bytes_read);
             } else {
                 printf("[recv_file] bytes_read <= 0\n");
             }
         } while (bytes_read > 0);
 
-        close(fd);
+        close(fp);
         close(sockfd);
 
         printf("[get_file] File received >>%s<<\n", filename);
