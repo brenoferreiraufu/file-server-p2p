@@ -262,17 +262,13 @@ int main(int argc, char const *argv[])
             status = ERROR;
             error_handler("[main] pthread create failed.");
         }
-
-        printf("[main] %ld thread created.\n", num_threads + 1);
-
+        
         status = pthread_detach(threads[num_threads]);
         
         if (status != SUCCESS) {
             status = ERROR;
             error_handler("[main] pthread detach failed.");
         }
-
-        printf("[main] %ld thread detached.\n", num_threads + 1);
 
     } while (++num_threads < MAX_NUM_THREAD);
 
