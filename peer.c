@@ -21,7 +21,6 @@ typedef struct file_info {
     char id[UUID_STR_LEN];
 } file_info;
 
-char tracker_ip[INET_ADDRSTRLEN] = "192.168.100.192";
 long num_threads = 0;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 int seederfd, finfo_size = 0;
@@ -242,7 +241,7 @@ void get_file()
     char *filename, *id, *address;
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
     int sockfd;
-    int bytes_written, data_length;
+    int bytes_written;
     struct sockaddr_in peeraddr;
 
     /******************************************************/
@@ -401,6 +400,7 @@ void share_file()
     char filename[FILENAME_MAX_LENGTH] = {'\0'};
     char recvfilename[FILENAME_MAX_LENGTH + 4] = {'\0'};
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
+    char tracker_ip[INET_ADDRSTRLEN] = {'\0'};
 
     /* Create table; no error checking is performed. */
 
@@ -423,7 +423,7 @@ void share_file()
     /* respota.                                           */
     /******************************************************/
 
-    conn_tracker(buffer, &recv_buffer);
+    conn_tracker(buffer, &recv_buffer, tracker_ip);
 
     /******************************************************/
     /* Cria nome do arquivo que vai guardar respota do    */
