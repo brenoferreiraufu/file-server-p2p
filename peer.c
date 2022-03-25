@@ -15,6 +15,7 @@
 #define MAX_NUM_THREADS 8
 #define FILE_NOT_FOUND "FAIL\nnot-found\n"
 #define ADD_PEER_SUCCESS "SUCCESS\npeer-added\n"
+#define OK_MSG "OK"
 
 typedef struct file_info {
     char filename[FILENAME_MAX_LENGTH];
@@ -79,6 +80,31 @@ void *peer_conn(void* arg) {
         }
 
         int fp = open(finfo[index_file].filename, O_RDONLY);
+
+        if (fp < 0) {  
+            finfo[index_file].filename = "\0";
+            finfo[index_file].id = "\0";
+            perror("[peer_conn] File not found.");
+
+            int bytes_written = send(client_sock, FILE_NOT_FOUND, strlen(FILE_NOT_FOUND), 0);
+
+            if (bytes_written == ERROR)
+            {
+                perror("[peer_conn] Failed to send message.");
+            }
+
+            close(client_sock);
+            continue;
+        }
+
+        bytes_written = send(client_sock, OK_MSG, strlen(OK_MSG), 0);
+
+        if (bytes_written == ERROR)
+        {
+            perror("[peer_conn] Failed to send filname message.");
+            close(client_sock);
+            continue;
+        }
 
         do
         {
@@ -235,6 +261,7 @@ void get_file()
     char seekfile[FILENAME_MAX_LENGTH + 4] = {'\0'};
     char fbuffer[BUFFER_SIZE_FILE] = {'\0'};
     char rbuffer[BUFFER_SIZE_MSG] = {'\0'};
+    char fstbuffer[BUFFER_SIZE_MSG] = {'\0'};
     int bytes_read;
     char *filename, *id, *address;
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
@@ -321,6 +348,27 @@ void get_file()
         if (bytes_written == ERROR)
         {
             perror("[get_file] Failed to send filname message.");
+            address = strtok(NULL, "\n");
+            continue;
+        }
+
+        data_length = recv(sockfd, fstbuffer, BUFFER_SIZE_MSG, 0);
+
+        if (data_length == ERROR)
+        {
+            perror("[peer_conn] Failed to recieve data.");
+            address = strtok(NULL, "\n");
+            continue;
+        }
+
+        if (data_length == 0)
+        {
+            perror("[peer_conn] Connection closed by tracker.");
+            address = strtok(NULL, "\n");
+            continue;
+        }
+
+        if (!strcmp(fstbuffer, FILE_NOT_FOUND)) {
             address = strtok(NULL, "\n");
             continue;
         }
