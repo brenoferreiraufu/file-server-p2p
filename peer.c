@@ -237,6 +237,7 @@ void get_file()
     char add_msg[BUFFER_SIZE_MSG] = {'\0'};
     char seekfile[FILENAME_MAX_LENGTH + 4] = {'\0'};
     char fbuffer[BUFFER_SIZE_FILE] = {'\0'};
+    char rbuffer[BUFFER_SIZE_MSG] = {'\0'};
     int bytes_read;
     char *filename, *id, *address;
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
@@ -267,10 +268,11 @@ void get_file()
     }
 
     fread(buffer, sizeof(buffer), 1, fp);
-
+    
     fclose(fp);
 
-    strtok(buffer, "\n");
+    strcpy(rbuffer, buffer);
+    strtok(rbuffer, "\n");
     strtok(NULL, "\n");
     char *ip_tracker = strtok(NULL, "\n");
 
@@ -392,6 +394,8 @@ void get_file()
         
         break;
     }
+
+    free(recv_buffer);
 }
 
 void share_file()
