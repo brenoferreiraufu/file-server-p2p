@@ -361,7 +361,6 @@ void get_file()
         {
             printf("[get_file] connection with tracker failed, cannot add peer...\n");
             close(trackersockfd);
-            close(sockfd);
             break;
         }
 
@@ -391,6 +390,7 @@ void get_file()
         printf("%s\n", recv_buffer);
 
         close(trackersockfd);
+        break;
     }
 }
 
