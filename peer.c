@@ -15,6 +15,7 @@
 #define MAX_NUM_THREADS 8
 #define FILE_NOT_FOUND "FAIL\nnot-found\n"
 #define ADD_PEER_SUCCESS "SUCCESS\npeer-added\n"
+#define REMOVE_PEER_SUCCESS "SUCCESS\npeer-removed\n"
 #define OK_MSG "OK"
 
 typedef struct file_info {
@@ -25,7 +26,7 @@ typedef struct file_info {
 long num_threads = 0;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 int seederfd, finfo_size = 0;
-file_info finfo[30];
+file_info finfo[100];
 
 void *peer_conn(void* arg) {
     int client_sock;
@@ -258,6 +259,7 @@ void get_file()
 {
     char buffer[BUFFER_SIZE_MSG] = {'\0'};
     char add_msg[BUFFER_SIZE_MSG] = {'\0'};
+    char rmv_msg[BUFFER_SIZE_MSG] = {'\0'};
     char seekfile[FILENAME_MAX_LENGTH + 4] = {'\0'};
     char fbuffer[BUFFER_SIZE_FILE] = {'\0'};
     char rbuffer[BUFFER_SIZE_MSG] = {'\0'};
@@ -266,6 +268,7 @@ void get_file()
     char *filename, *id, *address;
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
     char *recv_buffer2 = calloc(BUFFER_SIZE_MSG, 1);
+    char *recv_buffer3 = calloc(BUFFER_SIZE_MSG, 1);
     int sockfd;
     int bytes_written;
     struct sockaddr_in peeraddr;
@@ -369,6 +372,8 @@ void get_file()
         }
 
         if (!strcmp(fstbuffer, FILE_NOT_FOUND)) {
+            sprintf(rmv_msg, "REMOVE\n%s\n%s", id, address);
+            conn_tracker(rmv_msg, &recv_buffer3, ip_tracker);
             address = strtok(NULL, "\n");
             continue;
         }
@@ -416,7 +421,9 @@ void get_file()
         break;
     }
 
+    free(recv_buffer1);
     free(recv_buffer2);
+    free(recv_buffer3);
 }
 
 void share_file()

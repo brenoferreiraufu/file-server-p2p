@@ -15,6 +15,7 @@
 #define LIST_INSERT_FAILED "FAIL\nno-space\n"
 #define TORRENT_NOT_FOUND "FAIL\nnot-found\n"
 #define ADD_PEER_SUCCESS "SUCCESS\npeer-added\n"
+#define REMOVE_PEER_SUCCESS "SUCCESS\npeer-removed\n"
 
 int sock, status;
 const char *tracker_ip;
@@ -106,6 +107,40 @@ void add_peer_to_session(int client_sock, char id[UUID_STR_LEN], struct sockaddr
     printf("[add_peer_to_session] PEER ADICIONADO\n");
 }
 
+void remove_peer_to_session(int client_sock, char id[UUID_STR_LEN], char peer[INET_ADDRSTRLEN], struct sockaddr_in sock_addr) {
+    int bytes_written;
+    char address[INET_ADDRSTRLEN];
+    session *se;
+
+    inet_ntop(AF_INET, &(sock_addr.sin_addr), address, INET_ADDRSTRLEN); // converte para string
+
+    pthread_mutex_lock(&mutex);
+    se = get_session_by_id(li, id);
+
+    if (se == NULL) {
+        bytes_written = send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+
+        if (bytes_written == ERROR)
+            perror("[remove_peer_to_session] Failed to send not found message.");
+
+    } else {
+        remove_peer(se, peer);
+        
+        bytes_written = send(client_sock, REMOVE_PEER_SUCCESS, strlen(REMOVE_PEER_SUCCESS), 0);
+
+        if (bytes_written == ERROR)
+            perror("[remove_peer_to_session] Failed to send REMOVE_PEER_SUCCESS message.");
+
+        se = get_session_by_id(li, id);
+        if (se->head == NULL) {
+            remove_session(li, id);
+        }
+    }
+    pthread_mutex_unlock(&mutex);
+
+    printf("[remove_peer_to_session] PEER REMOVIDO\n");
+}
+
 void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[260]) {
     char buffer[BUFFER_SIZE_MSG];
     char address[INET_ADDRSTRLEN];
@@ -137,7 +172,7 @@ void *handle_connections(void *arg) {
     int client_sock, data_length;
     long id = (long) arg + 1;
     char buffer[BUFFER_SIZE_MSG] = {'\0'};
-    char *method, *filename, *uuid;
+    char *method, *filename, *uuid, *peer;
     struct sockaddr_in sock_addr;
     socklen_t client_address_len = sizeof(sock_addr);
 
@@ -185,6 +220,10 @@ void *handle_connections(void *arg) {
         } else if (!strcmp(method, "ADD")) {
             uuid = strtok(NULL, "\n");
             add_peer_to_session(client_sock, uuid, sock_addr);
+        } else if (!strcmp(method, "REMOVE")) {
+            uuid = strtok(NULL, "\n");
+            peer = strktok(NULL, "\n");
+            remove_peer_to_session(client_sock, uuid, peer, sock_addr);
         } else {
             printf("[thread-%ld] Invalid message from %d client socket.", id, client_sock);
             close(client_sock);
