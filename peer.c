@@ -405,6 +405,10 @@ void get_file()
         if (!strcmp(recv_buffer2, ADD_PEER_SUCCESS)) {
             printf("[get_file] PEER ADICIONADO\n");
             printf("%s\n", recv_buffer2);
+
+            strcpy(finfo[finfo_size].filename, filename);
+            strcpy(finfo[finfo_size].id, id);
+            finfo_size++;
         } else {
             printf("[get_file] PEER NÃO ADICIONADO\n");
         }
