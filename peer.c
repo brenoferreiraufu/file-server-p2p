@@ -418,7 +418,7 @@ void share_file()
     printf("\nDigite IP do tracker: ");
     fgets(tracker_ip, INET_ADDRSTRLEN, stdin);
     tracker_ip[strcspn(tracker_ip, "\n")] = '\0';
-    getc();
+    getchar();
 
     /******************************************************/
     /* Conecta com o tracker envia mensagem e recebe      */
