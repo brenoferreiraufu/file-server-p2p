@@ -13,6 +13,7 @@
 #define TRACKER_PORT 49154
 #define LISTEN_BACKLOG 11
 #define MAX_NUM_THREADS 8
+#define TORRENT_NOT_FOUND "FAIL\nnot-found\n"
 #define FILE_NOT_FOUND "FAIL\nnot-found\n"
 #define ADD_PEER_SUCCESS "SUCCESS\npeer-added\n"
 #define REMOVE_PEER_SUCCESS "SUCCESS\npeer-removed\n"
@@ -315,6 +316,12 @@ void get_file()
     /* Tenta se conectar com os peers para baixar o       */
     /* arquivo.                                           */
     /******************************************************/
+
+    if (!strcmp(TORRENT_NOT_FOUND, recv_buffer))
+    {
+        printf("File not found\n");
+        return;
+    }
 
     filename = strtok(recv_buffer, "\n");
     id = strtok(NULL, "\n");
