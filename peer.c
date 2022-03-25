@@ -285,7 +285,7 @@ void get_file()
     char seekfile[FILENAME_MAX_LENGTH + 4] = {'\0'};
     char *filename, *id, *address;
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
-    int sockfd;
+    int sockfd, trackersockfd;
     int bytes_written, data_length;
     struct sockaddr_in peeraddr;
     struct sockaddr_in trackeraddr;
@@ -383,10 +383,13 @@ void get_file()
         recv_file(sockfd, fp);
         printf("[get_file] File received >>%s<<\n", filename);
 
+        trackersockfd = socket(AF_INET, SOCK_STREAM, 0);
+
         // TODO CRIAR OUTRO SOCKER PRA COMUNICAR COM O TRACKER \/ ERRO
-        if (connect(sockfd, (struct sockaddr *)&trackeraddr, sizeof(trackeraddr)) < 0)
+        if (connect(trackersockfd, (struct sockaddr *)&trackeraddr, sizeof(trackeraddr)) < 0)
         {
             printf("[get_file] connection with tracker failed, cannot add peer...\n");
+            close(trackersockfd);
             close(sockfd);
             break;
         }
@@ -396,6 +399,7 @@ void get_file()
         if (bytes_written == ERROR)
         {
             perror("[get_file] Failed to send ADD_PEER_MSG message.");
+            close(trackersockfd);
             close(sockfd);
             break;
         }
@@ -409,12 +413,14 @@ void get_file()
         if (data_length == ERROR)
         {
             perror("[get_file] Failed to recieve ADD_PEER response from tracker.");
+            close(trackersockfd);
             close(sockfd);
             break;
         }
 
         puts(recv_buffer);
 
+        close(trackersockfd);
         close(sockfd);
     }
 }
