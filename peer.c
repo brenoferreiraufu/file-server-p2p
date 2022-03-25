@@ -29,7 +29,7 @@ file_info finfo[30];
 
 void *peer_conn(void* arg) {
     int client_sock;
-    int bytes_read;
+    int bytes_read, bytes_written;
     int data_length = 0;
     char buffer[BUFFER_SIZE_MSG] = {'\0'};
     char fbuffer[BUFFER_SIZE_FILE] = {'\0'};
@@ -82,8 +82,8 @@ void *peer_conn(void* arg) {
         int fp = open(finfo[index_file].filename, O_RDONLY);
 
         if (fp < 0) {  
-            finfo[index_file].filename = "\0";
-            finfo[index_file].id = "\0";
+            strcpy(finfo[index_file].filename, "\0");
+            strcpy(finfo[index_file].id, "\0");
             perror("[peer_conn] File not found.");
 
             int bytes_written = send(client_sock, FILE_NOT_FOUND, strlen(FILE_NOT_FOUND), 0);
@@ -262,7 +262,7 @@ void get_file()
     char fbuffer[BUFFER_SIZE_FILE] = {'\0'};
     char rbuffer[BUFFER_SIZE_MSG] = {'\0'};
     char fstbuffer[BUFFER_SIZE_MSG] = {'\0'};
-    int bytes_read;
+    int bytes_read, data_length;
     char *filename, *id, *address;
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
     char *recv_buffer2 = calloc(BUFFER_SIZE_MSG, 1);
