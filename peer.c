@@ -14,6 +14,7 @@
 #define LISTEN_BACKLOG 11
 #define MAX_NUM_THREADS 8
 #define FILE_NOT_FOUND "FAIL\nnot-found\n"
+#define ADD_PEER_SUCCESS "SUCCESS\npeer-added\n"
 
 typedef struct file_info {
     char filename[FILENAME_MAX_LENGTH];
@@ -165,7 +166,7 @@ void *peer_seeder(void* arg) {
     while(TRUE);
 }
 
-void conn_tracker(const char *send_b, char **recv_b)
+void conn_tracker(const char *send_b, char **recv_b, char *ip_tracker)
 {
     int sockfd;
     int bytes_written, data_length;
@@ -174,10 +175,6 @@ void conn_tracker(const char *send_b, char **recv_b)
     /************************************************/
     /* Configura a conexão do socket com o tracker. */
     /************************************************/
-
-    // printf("Digite IP do tracker:\n");
-    // fgets(tracker_ip, INET_ADDRSTRLEN, stdin);
-    // tracker_ip[strcspn(tracker_ip, "\n")] = '\0';
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -188,7 +185,7 @@ void conn_tracker(const char *send_b, char **recv_b)
     }
 
     memset(&servaddr, 0, sizeof(servaddr));
-    inet_pton(AF_INET, tracker_ip, &(servaddr.sin_addr.s_addr));
+    inet_pton(AF_INET, ip_tracker, &(servaddr.sin_addr.s_addr));
     servaddr.sin_port = htons(TRACKER_PORT);
     servaddr.sin_family = AF_INET;
 
@@ -244,15 +241,9 @@ void get_file()
     int bytes_read;
     char *filename, *id, *address;
     char *recv_buffer = calloc(BUFFER_SIZE_MSG, 1);
-    int sockfd, trackersockfd;
+    int sockfd;
     int bytes_written, data_length;
     struct sockaddr_in peeraddr;
-    struct sockaddr_in trackeraddr;
-
-    memset(&trackeraddr, 0, sizeof(trackeraddr));
-    inet_pton(AF_INET, tracker_ip, &(trackeraddr.sin_addr.s_addr));
-    trackeraddr.sin_port = htons(TRACKER_PORT);
-    trackeraddr.sin_family = AF_INET;
 
     /******************************************************/
     /* Lê nome do arquivo que vai compartilhar e monta    */
@@ -280,12 +271,16 @@ void get_file()
 
     fclose(fp);
 
+    strtok(buffer, "\n");
+    strtok(NULL, "\n");
+    char *ip_tracker = strtok(NULL, "\n");
+
     /******************************************************/
     /* Conecta com o tracker envia mensagem e recebe      */
     /* respota.                                           */
     /******************************************************/
 
-    conn_tracker(buffer, &recv_buffer);
+    conn_tracker(buffer, &recv_buffer, ip_tracker);
 
     /******************************************************/
     /* Tenta se conectar com os peers para baixar o       */
@@ -385,42 +380,17 @@ void get_file()
 
         printf("[get_file] File received >>%s<<\n", filename);
 
-        trackersockfd = socket(AF_INET, SOCK_STREAM, 0);
-
-        if (connect(trackersockfd, (struct sockaddr *)&trackeraddr, sizeof(trackeraddr)) < 0)
-        {
-            printf("[get_file] connection with tracker failed, cannot add peer...\n");
-            close(trackersockfd);
-            break;
-        }
-
         sprintf(add_msg, "ADD\n%s", id);
-        bytes_written = send(trackersockfd, add_msg, strlen(add_msg), 0);
+        memset(&recv_buffer, 0, sizeof(recv_buffer));
+        conn_tracker(add_msg, &recv_buffer, ip_tracker);
 
-        if (bytes_written == ERROR)
-        {
-            perror("[get_file] Failed to send add_msg message.");
-            close(trackersockfd);
-            break;
+        if (!strcmp(recv_buffer, ADD_PEER_SUCCESS)) {
+            printf("[get_file] PEER ADICIONADO\n");
+            printf("%s\n", recv_buffer);
+        } else {
+            printf("[get_file] PEER NÃO ADICIONADO\n");
         }
-
-        /******************************************************/
-        /* Lê a resposta do tracker "OK".                     */
-        /******************************************************/
-
-        data_length = recv(trackersockfd, recv_buffer, BUFFER_SIZE_MSG, 0);
-
-        if (data_length == ERROR)
-        {
-            perror("[get_file] Failed to recieve ADD_PEER response from tracker.");
-            close(trackersockfd);
-            break;
-        }
-
-        printf("[get_file] PEER ADICIONADO\n");
-        printf("%s\n", recv_buffer);
-
-        close(trackersockfd);
+        
         break;
     }
 }
@@ -443,6 +413,10 @@ void share_file()
     fgets(filename, FILENAME_MAX_LENGTH, stdin);
     filename[strcspn(filename, "\n")] = '\0';
     sprintf(buffer, "POST\n%s", filename);
+
+    printf("Digite IP do tracker:\n");
+    fgets(tracker_ip, INET_ADDRSTRLEN, stdin);
+    tracker_ip[strcspn(tracker_ip, "\n")] = '\0';
 
     /******************************************************/
     /* Conecta com o tracker envia mensagem e recebe      */
