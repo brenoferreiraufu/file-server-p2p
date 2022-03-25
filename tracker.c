@@ -14,6 +14,8 @@
 
 #define LIST_INSERT_FAILED "FAIL\nno-space\n"
 #define TORRENT_NOT_FOUND "FAIL\nnot-found\n"
+#define ADD_PEER_SUCCESS "SUCCESS\npeer-added\n"
+#define REMOVE_PEER_SUCCESS "SUCCESS\npeer-removed\n"
 
 int sock, status;
 const char *tracker_ip;
@@ -29,20 +31,34 @@ void error_handler(const char* message) {
 }
 
 void seek_torrent(int client_sock, char id[UUID_STR_LEN]) {
+    int bytes_written;
     session *se;
 
     pthread_mutex_lock(&mutex);
     se = get_session_by_id(li, id);
 
     if (se == NULL) {
-        send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+        bytes_written = send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+
+        if (bytes_written == ERROR)
+            perror("[seek_torrent] Failed to send not found message.");
+
     } else {
         if (se->head == NULL) {
-            send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+            bytes_written = send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+
+            if (bytes_written == ERROR)
+                perror("[seek_torrent] Head null.");
+
             remove_session(li, id);
         } else {
             peer *next = se->head;
             char buffer[BUFFER_SIZE_MSG];
+        
+            strcat(buffer, se->filename);
+            strcat(buffer, "\n");
+            strcat(buffer, se->id);
+            strcat(buffer, "\n");
 
             while (next != NULL)
             {
@@ -50,18 +66,85 @@ void seek_torrent(int client_sock, char id[UUID_STR_LEN]) {
                 strcat(buffer, "\n");
                 next = next->next;
             }
+             strcat(buffer, "END");
             
-            send(client_sock, buffer, strlen(buffer), 0);
+            bytes_written = send(client_sock, buffer, strlen(buffer), 0);
+
+            if (bytes_written == ERROR)
+                perror("[seek_torrent] Failed to send message.");
         }
     }
     pthread_mutex_unlock(&mutex);
 
-    close(client_sock);
+}
+
+void add_peer_to_session(int client_sock, char id[UUID_STR_LEN], struct sockaddr_in sock_addr) {
+    int bytes_written;
+    char address[INET_ADDRSTRLEN];
+    session *se;
+
+    inet_ntop(AF_INET, &(sock_addr.sin_addr), address, INET_ADDRSTRLEN); // converte para string
+
+    pthread_mutex_lock(&mutex);
+    se = get_session_by_id(li, id);
+
+    if (se == NULL) {
+        bytes_written = send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+
+        if (bytes_written == ERROR)
+            perror("[add_peer_to_session] Failed to send not found message.");
+
+    } else {
+        insert_peer(se, address);
+        
+        bytes_written = send(client_sock, ADD_PEER_SUCCESS, strlen(ADD_PEER_SUCCESS), 0);
+
+        if (bytes_written == ERROR)
+            perror("[add_peer_to_session] Failed to send ADD_PEER_SUCCESS message.");
+    }
+    pthread_mutex_unlock(&mutex);
+
+    printf("[add_peer_to_session] PEER ADICIONADO\n");
+}
+
+void remove_peer_to_session(int client_sock, char id[UUID_STR_LEN], char peer[INET_ADDRSTRLEN], struct sockaddr_in sock_addr) {
+    int bytes_written;
+    char address[INET_ADDRSTRLEN];
+    session *se;
+
+    inet_ntop(AF_INET, &(sock_addr.sin_addr), address, INET_ADDRSTRLEN); // converte para string
+
+    pthread_mutex_lock(&mutex);
+    se = get_session_by_id(li, id);
+
+    if (se == NULL) {
+        bytes_written = send(client_sock, TORRENT_NOT_FOUND, sizeof(TORRENT_NOT_FOUND), 0);
+
+        if (bytes_written == ERROR)
+            perror("[remove_peer_to_session] Failed to send not found message.");
+
+    } else {
+        remove_peer(se, peer);
+        
+        bytes_written = send(client_sock, REMOVE_PEER_SUCCESS, strlen(REMOVE_PEER_SUCCESS), 0);
+
+        if (bytes_written == ERROR)
+            perror("[remove_peer_to_session] Failed to send REMOVE_PEER_SUCCESS message.");
+
+        se = get_session_by_id(li, id);
+        if (se->head == NULL) {
+            remove_session(li, id);
+        }
+    }
+    pthread_mutex_unlock(&mutex);
+
+    printf("[remove_peer_to_session] PEER REMOVIDO\n");
 }
 
 void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[260]) {
     char buffer[BUFFER_SIZE_MSG];
     char address[INET_ADDRSTRLEN];
+    int bytes_written;
     inet_ntop(AF_INET, &(sock_addr.sin_addr), address, INET_ADDRSTRLEN); // converte para string
     
     pthread_mutex_lock(&mutex);
@@ -69,21 +152,27 @@ void post_torrent(int client_sock, struct sockaddr_in sock_addr, char filename[2
     pthread_mutex_unlock(&mutex);
 
     if (se == NULL) {
-        send(client_sock, LIST_INSERT_FAILED, sizeof(LIST_INSERT_FAILED), 0);
+        bytes_written = send(client_sock, LIST_INSERT_FAILED, sizeof(LIST_INSERT_FAILED), 0);
+        
+        if (bytes_written == ERROR)
+            perror("[post_torrent] Failed to send insert failed message.");
+
+
     } else {
         sprintf(buffer, "SEEK\n%s\n%s", se->id, tracker_ip);
+        
+        bytes_written = send(client_sock, buffer, strlen(buffer), 0);
 
-        send(client_sock, buffer, strlen(buffer), 0);
+        if (bytes_written == ERROR)
+            perror("[post_torrent] Failed to send message.");
     }
-
-    close(client_sock);
 }
 
 void *handle_connections(void *arg) {
     int client_sock, data_length;
     long id = (long) arg + 1;
-    char buffer[BUFFER_SIZE_MSG];
-    char *method, *filename, *uuid;
+    char buffer[BUFFER_SIZE_MSG] = {'\0'};
+    char *method, *filename, *uuid, *peer;
     struct sockaddr_in sock_addr;
     socklen_t client_address_len = sizeof(sock_addr);
 
@@ -113,10 +202,12 @@ void *handle_connections(void *arg) {
 
         if (data_length == 0)
         {
-            printf("[thread-%ld] Connection closed by %d client socket.", id, client_sock);
+            printf("[thread-%ld] Connection closed by %d client socket.\n", id, client_sock);
             close(client_sock);
             continue;
         }
+
+        printf("[thread-%ld] Receive for %d client socket.\n", id, client_sock);
 
         method = strtok(buffer, "\n");
 
@@ -126,14 +217,21 @@ void *handle_connections(void *arg) {
         } else if (!strcmp(method, "POST")) {
             filename = strtok(NULL, "\n");
             post_torrent(client_sock, sock_addr, filename);
+        } else if (!strcmp(method, "ADD")) {
+            uuid = strtok(NULL, "\n");
+            add_peer_to_session(client_sock, uuid, sock_addr);
+        } else if (!strcmp(method, "REMOVE")) {
+            uuid = strtok(NULL, "\n");
+            peer = strtok(NULL, "\n");
+            remove_peer_to_session(client_sock, uuid, peer, sock_addr);
         } else {
             printf("[thread-%ld] Invalid message from %d client socket.", id, client_sock);
             close(client_sock);
             continue;
         }
 
+        close(client_sock);
     } while (TRUE);
-    
     
     pthread_exit(NULL);
 }
@@ -158,8 +256,6 @@ int main(int argc, char const *argv[])
         perror("[main] Failed to create list.");
         exit(EXIT_FAILURE);
     }
-
-    
 
     /******************************************/
     /* Criando o socket UDP para conexão.     */
@@ -205,17 +301,13 @@ int main(int argc, char const *argv[])
             status = ERROR;
             error_handler("[main] pthread create failed.");
         }
-
-        printf("[main] %ld thread created.\n", num_threads + 1);
-
+        
         status = pthread_detach(threads[num_threads]);
         
         if (status != SUCCESS) {
             status = ERROR;
             error_handler("[main] pthread detach failed.");
         }
-
-        printf("[main] %ld thread detached.\n", num_threads + 1);
 
     } while (++num_threads < MAX_NUM_THREAD);
 
