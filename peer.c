@@ -358,7 +358,7 @@ void get_file()
                 break;
             }
 
-            bytes_written = fwrite(fbuffer, sizeof(char), strlen(fbuffer), file);
+            bytes_written = fwrite(fbuffer, strlen(fbuffer), 1, file);
             
             if (ferror(file))
             {
