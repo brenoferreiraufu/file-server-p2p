@@ -222,7 +222,7 @@ void *handle_connections(void *arg) {
             add_peer_to_session(client_sock, uuid, sock_addr);
         } else if (!strcmp(method, "REMOVE")) {
             uuid = strtok(NULL, "\n");
-            peer = strktok(NULL, "\n");
+            peer = strtok(NULL, "\n");
             remove_peer_to_session(client_sock, uuid, peer, sock_addr);
         } else {
             printf("[thread-%ld] Invalid message from %d client socket.", id, client_sock);
