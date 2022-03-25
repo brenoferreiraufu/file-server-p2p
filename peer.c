@@ -414,7 +414,7 @@ void share_file()
     filename[strcspn(filename, "\n")] = '\0';
     sprintf(buffer, "POST\n%s", filename);
 
-    printf("Digite IP do tracker:\n");
+    printf("Digite IP do tracker: ");
     fgets(tracker_ip, INET_ADDRSTRLEN, stdin);
     tracker_ip[strcspn(tracker_ip, "\n")] = '\0';
 
