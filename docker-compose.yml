@@ -2,27 +2,27 @@ version: "3.7"
 
 services:
   tracker:
-  image: alpine:latest
-  command: sh -c "make all && ./p2p-tracker $IP_TRACKER"
-  working_dir: /tracker
-  volumes: ./:/tracker
-  environment:
-    - IP_TRACKER: tracker
+    image: alpine:latest
+    command: sh -c "make all && ./p2p-tracker $IP_TRACKER"
+    working_dir: /tracker
+    volumes: ./:/tracker
+    environment:
+      - IP_TRACKER: tracker
 
   peer1:
-  image: alpine:latest
-  command: sh -c "make all && ./p2p-peer"
-  working_dir: /peer1
-  volumes: ./:/peer1
+    image: alpine:latest
+    command: sh -c "make all && ./p2p-peer"
+    working_dir: /peer1
+    volumes: ./:/peer1
 
   peer2:
-  image: alpine:latest
-  command: sh -c "make all && ./p2p-peer"
-  working_dir: /peer2
-  volumes: ./:/peer2
+    image: alpine:latest
+    command: sh -c "make all && ./p2p-peer"
+    working_dir: /peer2
+    volumes: ./:/peer2
 
   peer3:
-  image: alpine:latest
-  command: sh -c "make all && ./p2p-peer"
-  working_dir: /peer3
-  volumes: ./:/peer3
+    image: alpine:latest
+    command: sh -c "make all && ./p2p-peer"
+    working_dir: /peer3
+    volumes: ./:/peer3
